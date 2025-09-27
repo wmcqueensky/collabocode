@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// ...existing code...
+import React, { useEffect, useState, useRef } from "react";
 
 const slogans = [
 	"Code is better with company.",
@@ -13,6 +14,39 @@ const Hero: React.FC = () => {
 	const [index, setIndex] = useState(0);
 	const [charIndex, setCharIndex] = useState(0);
 	const [isDeleting, setIsDeleting] = useState(false);
+
+	// added ref + resume helpers for Safari back/forward cache issues
+	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const tryPlayVideo = () => {
+		const v = videoRef.current;
+		if (!v) return;
+		const p = v.play();
+		if (p && typeof p.catch === "function")
+			p.catch(() => {
+				// ignore play rejections (autoplay policies) — we'll retry on visibility/focus/pageshow
+			});
+	};
+
+	useEffect(() => {
+		// try play on mount, and when page is shown / becomes visible / window focused
+		tryPlayVideo();
+
+		const onPageShow = () => tryPlayVideo();
+		const onVisibilityChange = () => {
+			if (!document.hidden) tryPlayVideo();
+		};
+		const onFocus = () => tryPlayVideo();
+
+		window.addEventListener("pageshow", onPageShow);
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		window.addEventListener("focus", onFocus);
+
+		return () => {
+			window.removeEventListener("pageshow", onPageShow);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
+			window.removeEventListener("focus", onFocus);
+		};
+	}, []);
 
 	useEffect(() => {
 		const current = slogans[index];
@@ -46,9 +80,11 @@ const Hero: React.FC = () => {
 	return (
 		<section id="hero" className="relative min-h-screen w-full overflow-hidden">
 			<video
+				ref={videoRef}
 				autoPlay
 				loop
 				muted
+				playsInline
 				className="absolute inset-0 w-full h-full object-cover"
 				src="/coding.mp4"
 			/>
