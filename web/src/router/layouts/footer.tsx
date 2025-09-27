@@ -1,5 +1,5 @@
 const Footer = () => {
-	return <>To jest footer</>;
+	return <></>;
 };
 
 export default Footer;
