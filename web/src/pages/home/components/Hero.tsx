@@ -1,5 +1,4 @@
-// ...existing code...
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const slogans = [
 	"Code is better with company.",
@@ -9,7 +8,7 @@ const slogans = [
 	"From solo to squad.",
 ];
 
-const Hero: React.FC = () => {
+const Hero = () => {
 	const [text, setText] = useState("");
 	const [index, setIndex] = useState(0);
 	const [charIndex, setCharIndex] = useState(0);

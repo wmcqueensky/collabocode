@@ -1,6 +1,4 @@
-import React from "react";
-
-const HowItWorks: React.FC = () => {
+const HowItWorks = () => {
 	return (
 		<section id="how-it-works" className="bg-[#171717] py-16 px-4 sm:px-6">
 			<div className="max-w-5xl mx-auto space-y-10 text-center">

@@ -1,6 +1,4 @@
-import React from "react";
-
-const Features: React.FC = () => {
+const Features = () => {
 	return (
 		<section id="features" className="bg-[#2c2c2c] py-16 px-4 sm:px-6">
 			<div className="max-w-5xl mx-auto space-y-12 text-center">

@@ -1,6 +1,4 @@
-import React from "react";
-
-const OurStory: React.FC = () => {
+const OurStory = () => {
 	return (
 		<section id="our-story" className="bg-[#2c2c2c] py-16 px-4 sm:px-6">
 			<div className="max-w-4xl mx-auto text-center space-y-6">
