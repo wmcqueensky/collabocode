@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Clock, Code, Star, Zap, Users, Rocket } from "lucide-react";
-import Navbar from "./components/layout/Navbar";
-import Footer from "./components/layout/Footer";
 import ExploreCard from "./components/cards/ExploreCard";
 import ComingSoonCard from "./components/cards/ComingSoonCard";
 import SectionHeader from "./components/layout/SectionHeader";
@@ -17,9 +15,6 @@ export default function ExplorePage() {
 
 	return (
 		<main className="min-h-screen bg-[#171717] text-gray-200">
-			{/* Dashboard Header */}
-			<Navbar currentPage="dashboard" />
-
 			{/* Main Dashboard */}
 			<div className="max-w-6xl mx-auto px-4 py-12">
 				<PageTitle
@@ -318,9 +313,6 @@ export default function ExplorePage() {
 				isOpen={isCollaborationModalOpen}
 				onClose={() => setIsCollaborationModalOpen(false)}
 			/>
-
-			{/* Footer */}
-			<Footer />
 		</main>
 	);
 }

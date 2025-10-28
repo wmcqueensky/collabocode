@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Bell, Flame, ChevronDown, Menu, X } from "lucide-react";
 
 type HeaderProps = {
-	currentPage: string;
+	currentPage?: string;
 	initialLoggedInState?: boolean;
 };
 

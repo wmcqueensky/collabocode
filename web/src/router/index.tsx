@@ -1,5 +1,6 @@
 import { Navigate, Routes, Route } from "react-router-dom";
-import Layout from "./layouts/index";
+import MainLayout from "./layouts/main";
+import HomeLayout from "./layouts/home";
 import HomePage from "../pages/home";
 import MatchPage from "../pages/match";
 import CollaborationPage from "../pages/collaboration";
@@ -18,17 +19,21 @@ import {
 
 const Router = () => (
 	<Routes>
-		<Route element={<Layout />}>
+		<Route path={HOME_PATH} element={<HomeLayout />}>
 			<Route index element={<HomePage />} />
+		</Route>
+
+		<Route element={<MainLayout />}>
+			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
 			<Route path={MATCH_PATH} element={<MatchPage />} />
 			<Route path={COLLABORATION_PATH} element={<CollaborationPage />} />
-			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
 			<Route path={MATCH_SUMMARY_PATH} element={<MatchSummaryPage />} />
 			<Route
 				path={COLLABORATION_SUMMARY_PATH}
 				element={<CollaborationSummaryPage />}
 			/>
 		</Route>
+
 		<Route path="*" element={<Navigate to={HOME_PATH} />} />
 	</Routes>
 );
