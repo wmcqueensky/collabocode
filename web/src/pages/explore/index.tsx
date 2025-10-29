@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { Clock, Code, Star, Zap, Users, Rocket } from "lucide-react";
 import ExploreCard from "./components/cards/ExploreCard";
-import ComingSoonCard from "./components/cards/ComingSoonCard";
-import SectionHeader from "./components/layout/SectionHeader";
-import ActivityList from "./components/activity/ActivityList";
 import PageTitle from "./components/layout/PageTitle";
 import CollaborationModal from "./components/modals/collaboration/CollaborationModal";
 import CompetitionModal from "./components/modals/competition/CompetitionModal";
@@ -18,8 +15,8 @@ export default function ExplorePage() {
 			{/* Main Dashboard */}
 			<div className="max-w-6xl mx-auto px-4 py-12">
 				<PageTitle
-					title="Choose Your Collaboration Mode"
-					description="Select how you want to code together. Each mode is optimized for different collaboration styles and goals."
+					title="Choose Your Coding Mode"
+					description="Select how you want to code together. Each mode is optimized for different collaboration and rivalisation styles and goals."
 				/>
 
 				{/* Mode Selection Cards */}
@@ -165,48 +162,6 @@ export default function ExplorePage() {
 						buttonText="Start Collaboration"
 						buttonOnClick={() => setIsCollaborationModalOpen(true)}
 						tagText="Project Development & Collaboration"
-					/>
-				</section>
-
-				{/* Recent Activity */}
-				<section>
-					<SectionHeader
-						title="Recent Activity"
-						actionText="View All"
-						actionLink="#"
-					/>
-
-					<ActivityList
-						title="Your Recent Sessions"
-						timeframe="Last 7 days"
-						activities={[
-							{
-								title: "Two Sum Problem Session",
-								mode: "LeetCode Mode",
-								date: "May 12, 2025",
-								duration: "25 minutes",
-								actionText: "View Results",
-								actionLink: "#",
-							},
-							{
-								title: "Weather App Project",
-								mode: "Codebase Mode",
-								date: "May 10, 2025",
-								duration: "1 hour 15 minutes",
-								actionText: "Continue",
-								actionLink: "#",
-							},
-							{
-								title: "Binary Tree Traversal Practice",
-								mode: "LeetCode Mode",
-								date: "May 8, 2025",
-								duration: "45 minutes",
-								actionText: "View Results",
-								actionLink: "#",
-							},
-						]}
-						footerText="Create a New Session"
-						footerLink="#"
 					/>
 				</section>
 			</div>
