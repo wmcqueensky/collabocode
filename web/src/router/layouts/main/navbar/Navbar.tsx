@@ -1,45 +1,24 @@
+// components/Navbar.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Menu, X } from "lucide-react";
+import { useAuth } from "../../../../contexts/AuthContext";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
 
-type NavbarProps = {
-	initialLoggedInState?: boolean;
-};
-
-const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
-	const [isLoggedIn, setIsLoggedIn] = useState(initialLoggedInState);
+const Navbar = () => {
+	const { user, signOut, loading } = useAuth();
 	const [showMobileMenu, setShowMobileMenu] = useState(false);
 	const [showUserMenu, setShowUserMenu] = useState(false);
 	const [showLoginModal, setShowLoginModal] = useState(false);
 	const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-	const user = isLoggedIn
-		? {
-				name: "Jane Doe",
-				avatar: "/api/placeholder/32/32",
-		  }
-		: null;
-
 	const toggleUserMenu = () => {
 		setShowUserMenu(!showUserMenu);
 	};
 
-	const handleLogin = (e: React.FormEvent) => {
-		e.preventDefault();
-		setIsLoggedIn(true);
-		setShowLoginModal(false);
-	};
-
-	const handleRegister = (e: React.FormEvent) => {
-		e.preventDefault();
-		setIsLoggedIn(true);
-		setShowRegisterModal(false);
-	};
-
-	const handleLogout = () => {
-		setIsLoggedIn(false);
+	const handleLogout = async () => {
+		await signOut();
 		setShowUserMenu(false);
 	};
 
@@ -52,6 +31,45 @@ const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
 		setShowRegisterModal(false);
 		setShowLoginModal(true);
 	};
+
+	// Get username from metadata or use first part of email
+	const username =
+		user?.user_metadata?.username || user?.email?.split("@")[0] || "User";
+	const avatarLetter = username[0]?.toUpperCase() || "U";
+
+	if (loading) {
+		return (
+			<header className="bg-[#1a1a1a] border-b border-gray-800 py-3 sticky top-0 z-50">
+				<div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
+					<div className="flex items-center space-x-2">
+						<Link to="/" className="flex items-center space-x-2">
+							<h1 className="text-2xl font-bold flex items-center">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									className="w-7 h-7 text-white mr-1"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									strokeWidth={2}
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										d="M9.75 6.75L5.25 12l4.5 5.25M14.25 6.75L18.75 12l-4.5 5.25"
+									/>
+								</svg>
+								<span className="text-white">Collabo</span>
+								<span className="text-[#5bc6ca]">Code</span>
+							</h1>
+						</Link>
+					</div>
+					<div className="flex items-center space-x-4">
+						<div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse"></div>
+					</div>
+				</div>
+			</header>
+		);
+	}
 
 	return (
 		<header className="bg-[#1a1a1a] border-b border-gray-800 py-3 sticky top-0 z-50">
@@ -80,7 +98,7 @@ const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
 				</div>
 
 				<div className="flex items-center space-x-4">
-					{isLoggedIn ? (
+					{user ? (
 						<div className="relative">
 							<button
 								onClick={toggleUserMenu}
@@ -88,19 +106,19 @@ const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
 								aria-expanded={showUserMenu}
 								aria-haspopup="true"
 							>
-								<img
-									src={user?.avatar ?? ""}
-									alt="User avatar"
-									className="w-8 h-8 rounded-full border border-gray-700"
-								/>
+								<div className="w-8 h-8 rounded-full border border-gray-700 bg-[#5bc6ca] flex items-center justify-center">
+									<span className="text-white font-medium text-sm">
+										{avatarLetter}
+									</span>
+								</div>
 								<ChevronDown size={16} className="text-gray-400" />
 							</button>
 
 							{showUserMenu && (
 								<div className="absolute right-0 mt-2 w-64 bg-[#252525] border border-gray-700 rounded-md shadow-lg py-1 z-10">
 									<div className="px-4 py-3 border-b border-gray-700">
-										<p className="font-medium text-gray-200">{user?.name}</p>
-										<p className="text-sm text-gray-400">user@example.com</p>
+										<p className="font-medium text-gray-200">{username}</p>
+										<p className="text-sm text-gray-400">{user.email}</p>
 									</div>
 
 									<div className="py-1">
@@ -162,7 +180,7 @@ const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
 			{showMobileMenu && (
 				<div className="md:hidden bg-[#1a1a1a] px-4 pt-2 pb-4 border-t border-gray-800">
 					<nav className="space-y-1">
-						{isLoggedIn ? (
+						{user ? (
 							<>
 								<button
 									disabled
@@ -212,14 +230,12 @@ const Navbar = ({ initialLoggedInState = false }: NavbarProps) => {
 			<LoginModal
 				isOpen={showLoginModal}
 				onClose={() => setShowLoginModal(false)}
-				onSubmit={handleLogin}
 				onSwitchModal={switchToRegister}
 			/>
 
 			<RegisterModal
 				isOpen={showRegisterModal}
 				onClose={() => setShowRegisterModal(false)}
-				onSubmit={handleRegister}
 				onSwitchModal={switchToLogin}
 			/>
 		</header>
