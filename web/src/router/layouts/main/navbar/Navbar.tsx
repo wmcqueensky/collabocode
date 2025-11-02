@@ -1,10 +1,10 @@
-// components/Navbar.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { useAuth } from "../../../../contexts/AuthContext";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
+import NotificationCenter from "../../../../components/notifications/NotificationCenter";
 
 const Navbar = () => {
 	const { user, signOut, loading } = useAuth();
@@ -99,54 +99,59 @@ const Navbar = () => {
 
 				<div className="flex items-center space-x-4">
 					{user ? (
-						<div className="relative">
-							<button
-								onClick={toggleUserMenu}
-								className="flex items-center space-x-1 focus:outline-none"
-								aria-expanded={showUserMenu}
-								aria-haspopup="true"
-							>
-								<div className="w-8 h-8 rounded-full border border-gray-700 bg-[#5bc6ca] flex items-center justify-center">
-									<span className="text-white font-medium text-sm">
-										{avatarLetter}
-									</span>
-								</div>
-								<ChevronDown size={16} className="text-gray-400" />
-							</button>
+						<>
+							<NotificationCenter />
 
-							{showUserMenu && (
-								<div className="absolute right-0 mt-2 w-64 bg-[#252525] border border-gray-700 rounded-md shadow-lg py-1 z-10">
-									<div className="px-4 py-3 border-b border-gray-700">
-										<p className="font-medium text-gray-200">{username}</p>
-										<p className="text-sm text-gray-400">{user.email}</p>
+							{/* User Menu */}
+							<div className="relative">
+								<button
+									onClick={toggleUserMenu}
+									className="flex items-center space-x-1 focus:outline-none"
+									aria-expanded={showUserMenu}
+									aria-haspopup="true"
+								>
+									<div className="w-8 h-8 rounded-full border border-gray-700 bg-[#5bc6ca] flex items-center justify-center">
+										<span className="text-white font-medium text-sm">
+											{avatarLetter}
+										</span>
 									</div>
+									<ChevronDown size={16} className="text-gray-400" />
+								</button>
 
-									<div className="py-1">
-										<button
-											disabled
-											className="w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
-										>
-											Your Profile
-										</button>
-										<button
-											disabled
-											className="w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
-										>
-											Settings
-										</button>
-									</div>
+								{showUserMenu && (
+									<div className="absolute right-0 mt-2 w-64 bg-[#252525] border border-gray-700 rounded-md shadow-lg py-1 z-10">
+										<div className="px-4 py-3 border-b border-gray-700">
+											<p className="font-medium text-gray-200">{username}</p>
+											<p className="text-sm text-gray-400">{user.email}</p>
+										</div>
 
-									<div className="py-1 border-t border-gray-700">
-										<button
-											className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-											onClick={handleLogout}
-										>
-											Sign Out
-										</button>
+										<div className="py-1">
+											<button
+												disabled
+												className="w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+											>
+												Your Profile
+											</button>
+											<button
+												disabled
+												className="w-full text-left px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
+											>
+												Settings
+											</button>
+										</div>
+
+										<div className="py-1 border-t border-gray-700">
+											<button
+												className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+												onClick={handleLogout}
+											>
+												Sign Out
+											</button>
+										</div>
 									</div>
-								</div>
-							)}
-						</div>
+								)}
+							</div>
+						</>
 					) : (
 						<>
 							<button
