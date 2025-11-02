@@ -23,7 +23,7 @@ export default function ExplorePage() {
 				<section className="grid md:grid-cols-2 gap-8 mb-24">
 					{/* LeetCode Mode Card */}
 					<ExploreCard
-						title="LeetCode Mode"
+						title="Challenge Mode"
 						description="Solve coding challenges together with a timer. Perfect for interview preparation, algorithm practice, and educational sessions."
 						headerGradient="bg-gradient-to-r from-[#5bc6ca] to-[#48aeb3]"
 						headerContent={
