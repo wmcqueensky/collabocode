@@ -9,31 +9,101 @@ import SelectLeetCodeProblemStep from "./components/steps/SelectLeetCodeProblemS
 import ConfigureSessionStep from "./components/steps/ConfigureSessionStep";
 import InvitePlayersStep from "./components/steps/InvitePlayersStep";
 
-// Mock data
-import { getLeetCodeProblems, getAvailablePlayers } from "./data/mockData";
+// Hooks and Services
+import { useProblems } from "../../../../../hooks/useProblems";
+import { useFriends } from "../../../../../hooks/useFriends";
+import { sessionService } from "../../../../../services/sessionService";
+import type { Problem, Profile } from "../../../../../types/database";
 
-const CompetitionModal = ({ isOpen, onClose }: any) => {
+type CompetitionModalProps = {
+	isOpen: boolean;
+	onClose: () => void;
+};
+
+const CompetitionModal = ({ isOpen, onClose }: CompetitionModalProps) => {
 	const navigate = useNavigate();
+
+	// Hooks for data
+	const {
+		problems,
+		loading: problemsLoading,
+		error: problemsError,
+	} = useProblems();
+	const { friends, loading: friendsLoading, searchUsers } = useFriends();
+
+	// State
 	const [step, setStep] = useState(1);
-	const [selectedProblem, setSelectedProblem] = useState<any | null>(null);
+	const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
 	const [selectedLanguage, setSelectedLanguage] = useState("javascript");
 	const [timeLimit, setTimeLimit] = useState<number>(30);
 	const [playerCount, setPlayerCount] = useState<number>(2);
-	const [selectedPlayers, setSelectedPlayers] = useState<any[]>([]);
+	const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
+	const [creating, setCreating] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
+	// Handle ESC key
 	useEffect(() => {
 		const handleEscKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
+			if (event.key === "Escape" && !creating) {
 				onClose();
 			}
 		};
+
 		window.addEventListener("keydown", handleEscKey);
 		return () => window.removeEventListener("keydown", handleEscKey);
-	}, [onClose]);
+	}, [onClose, creating]);
 
-	const startSession = () => {
-		navigate("/match");
-		onClose();
+	// Reset state when modal closes
+	useEffect(() => {
+		if (!isOpen) {
+			setStep(1);
+			setSelectedProblem(null);
+			setSelectedLanguage("javascript");
+			setTimeLimit(30);
+			setPlayerCount(2);
+			setSelectedPlayers([]);
+			setError(null);
+		}
+	}, [isOpen]);
+
+	const startSession = async () => {
+		if (!selectedProblem) {
+			setError("Please select a problem");
+			return;
+		}
+
+		if (selectedPlayers.length !== playerCount - 1) {
+			setError(`Please select ${playerCount - 1} player(s)`);
+			return;
+		}
+
+		try {
+			setCreating(true);
+			setError(null);
+
+			// Create the session
+			const session = await sessionService.createSession({
+				problem_id: selectedProblem.id,
+				language: selectedLanguage,
+				time_limit: timeLimit,
+				max_players: playerCount,
+			});
+
+			// Invite selected players
+			const playerIds = selectedPlayers.map((p) => p.id);
+			if (playerIds.length > 0) {
+				await sessionService.invitePlayers(session.id, playerIds);
+			}
+
+			// Navigate to the match page
+			navigate(`/match/${session.id}`);
+			onClose();
+		} catch (err: any) {
+			console.error("Error creating session:", err);
+			setError(err.message || "Failed to create session. Please try again.");
+		} finally {
+			setCreating(false);
+		}
 	};
 
 	if (!isOpen) return null;
@@ -69,13 +139,21 @@ const CompetitionModal = ({ isOpen, onClose }: any) => {
 					onClose={onClose}
 				/>
 
+				{/* Error Display */}
+				{(error || problemsError) && (
+					<div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+						{error || problemsError}
+					</div>
+				)}
+
 				{/* Modal Content - scrollable area */}
 				<div className="flex-1 overflow-y-auto px-3 py-2 sm:px-4">
 					{step === 1 ? (
 						<SelectLeetCodeProblemStep
 							selectedProblem={selectedProblem}
 							setSelectedProblem={setSelectedProblem}
-							problems={getLeetCodeProblems()}
+							problems={problems}
+							loading={problemsLoading}
 						/>
 					) : step === 2 ? (
 						<ConfigureSessionStep
@@ -93,8 +171,11 @@ const CompetitionModal = ({ isOpen, onClose }: any) => {
 							selectedLanguage={selectedLanguage}
 							selectedPlayers={selectedPlayers}
 							setSelectedPlayers={setSelectedPlayers}
-							availablePlayers={getAvailablePlayers()}
+							availablePlayers={friends}
 							playerCount={playerCount}
+							timeLimit={timeLimit}
+							loading={friendsLoading}
+							searchUsers={searchUsers}
 						/>
 					)}
 				</div>
@@ -107,9 +188,11 @@ const CompetitionModal = ({ isOpen, onClose }: any) => {
 						setStep={setStep}
 						onClose={onClose}
 						startAction={startSession}
-						startActionText="Start LeetCode Session"
+						startActionText={
+							creating ? "Creating..." : "Start LeetCode Session"
+						}
 						canContinue={canContinue()}
-						canStart={step === 3 && canContinue()}
+						canStart={step === 3 && canContinue() && !creating}
 					/>
 				</div>
 			</div>
