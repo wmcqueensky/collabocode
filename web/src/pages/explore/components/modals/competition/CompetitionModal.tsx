@@ -1,3 +1,4 @@
+// CompetitionModal.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Code, Users } from "lucide-react";
@@ -81,7 +82,15 @@ const CompetitionModal = ({ isOpen, onClose }: CompetitionModalProps) => {
 			setCreating(true);
 			setError(null);
 
-			// Create the session
+			console.log("Creating session with:", {
+				problem: selectedProblem.title,
+				language: selectedLanguage,
+				timeLimit,
+				maxPlayers: playerCount,
+				selectedPlayers: selectedPlayers.map((p) => p.username),
+			});
+
+			// Create the session (host is automatically added as participant)
 			const session = await sessionService.createSession({
 				problem_id: selectedProblem.id,
 				language: selectedLanguage,
@@ -89,10 +98,14 @@ const CompetitionModal = ({ isOpen, onClose }: CompetitionModalProps) => {
 				max_players: playerCount,
 			});
 
-			// Invite selected players
-			const playerIds = selectedPlayers.map((p) => p.id);
-			if (playerIds.length > 0) {
+			console.log("Session created:", session.id);
+
+			// Invite selected players (excluding host)
+			if (selectedPlayers.length > 0) {
+				const playerIds = selectedPlayers.map((p) => p.id);
+				console.log("Inviting players:", playerIds);
 				await sessionService.invitePlayers(session.id, playerIds);
+				console.log("Players invited successfully");
 			}
 
 			// Navigate to the match page
