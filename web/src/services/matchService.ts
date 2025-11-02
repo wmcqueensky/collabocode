@@ -36,7 +36,7 @@ export const matchService = {
 		if (!session) return;
 
 		const participants = await sessionService.getSessionParticipants(sessionId);
-		const winner = participants.find((p) => p.ranking === 1);
+		// const winner = participants.find((p) => p.ranking === 1);
 
 		for (const participant of participants) {
 			if (participant.status !== "joined") continue;
