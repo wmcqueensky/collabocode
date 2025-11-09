@@ -25,15 +25,16 @@ const Router = () => (
 
 		<Route element={<MainLayout />}>
 			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
-			<Route path={`${MATCH_PATH}/:sessionId`} element={<MatchPage />} />
-			<Route path={MATCH_PATH} element={<MatchPage />} />
-			<Route path={COLLABORATION_PATH} element={<CollaborationPage />} />
 			<Route path={MATCH_SUMMARY_PATH} element={<MatchSummaryPage />} />
 			<Route
 				path={COLLABORATION_SUMMARY_PATH}
 				element={<CollaborationSummaryPage />}
 			/>
+			<Route path={COLLABORATION_PATH} element={<CollaborationPage />} />
 		</Route>
+
+		<Route path={`${MATCH_PATH}/:sessionId`} element={<MatchPage />} />
+		<Route path={MATCH_PATH} element={<MatchPage />} />
 
 		<Route path="*" element={<Navigate to={HOME_PATH} />} />
 	</Routes>

@@ -1,4 +1,3 @@
-// CompetitionModal.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Code, Users } from "lucide-react";
