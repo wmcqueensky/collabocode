@@ -21,7 +21,81 @@ const NotificationCenter = () => {
 
 	useEffect(() => {
 		loadNotifications();
-		subscribeToInvites();
+
+		// Set up real-time subscription
+		const setupSubscription = async () => {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+
+			if (!user) return;
+
+			const channel = supabase
+				.channel(`user-invites:${user.id}`)
+				.on(
+					"postgres_changes",
+					{
+						event: "INSERT",
+						schema: "public",
+						table: "session_participants",
+						filter: `user_id=eq.${user.id}`,
+					},
+					async (payload) => {
+						console.log("New invitation received:", payload);
+
+						// Small delay to ensure database transaction is complete
+						setTimeout(async () => {
+							await loadNotifications();
+						}, 100);
+
+						// Show browser notification if permitted
+						if (Notification.permission === "granted") {
+							new Notification("New Coding Session Invite!", {
+								body: "You have been invited to join a coding session",
+								icon: "/logo.png",
+							});
+						}
+					}
+				)
+				.on(
+					"postgres_changes",
+					{
+						event: "UPDATE",
+						schema: "public",
+						table: "session_participants",
+						filter: `user_id=eq.${user.id}`,
+					},
+					async (payload) => {
+						console.log("Participant status updated:", payload);
+						// Reload notifications to update the list
+						setTimeout(async () => {
+							await loadNotifications();
+						}, 100);
+					}
+				)
+				.subscribe((status) => {
+					console.log("Subscription status:", status);
+					if (status === "SUBSCRIBED") {
+						console.log("Successfully subscribed to notifications channel");
+					}
+				});
+
+			return () => {
+				supabase.removeChannel(channel);
+			};
+		};
+
+		const cleanup = setupSubscription();
+
+		// Also set up periodic polling as backup (every 10 seconds)
+		const pollInterval = setInterval(() => {
+			loadNotifications();
+		}, 10000);
+
+		return () => {
+			cleanup.then((cleanupFn) => cleanupFn && cleanupFn());
+			clearInterval(pollInterval);
+		};
 	}, []);
 
 	const loadNotifications = async () => {
@@ -66,43 +140,6 @@ const NotificationCenter = () => {
 		} finally {
 			setLoading(false);
 		}
-	};
-
-	const subscribeToInvites = () => {
-		const userResponse = supabase.auth.getUser();
-
-		userResponse.then(({ data: { user: userData } }) => {
-			if (!userData) return;
-			const channel = supabase
-				.channel(`user-invites:${userData.id}`)
-				.on(
-					"postgres_changes",
-					{
-						event: "INSERT",
-						schema: "public",
-						table: "session_participants",
-						filter: `user_id=eq.${userData.id}`,
-					},
-					async (payload) => {
-						console.log("New invitation received:", payload);
-						// Reload notifications when new invite comes in
-						await loadNotifications();
-
-						// Show browser notification if permitted
-						if (Notification.permission === "granted") {
-							new Notification("New Coding Session Invite!", {
-								body: "You have been invited to join a coding session",
-								icon: "/logo.png",
-							});
-						}
-					}
-				)
-				.subscribe();
-
-			return () => {
-				channel.unsubscribe();
-			};
-		});
 	};
 
 	const handleAcceptInvite = async (notification: Notification) => {
