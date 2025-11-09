@@ -10,7 +10,6 @@ import Footer from "./layout/Footer";
 import { RaceTrack } from "./chat/RaceTrack";
 import { RecentActivities } from "./chat/RecentActivities";
 
-// Services and hooks
 import { useSession } from "../../hooks/useSession";
 import { sessionService } from "../../services/sessionService";
 import { supabase } from "../../lib/supabase";
