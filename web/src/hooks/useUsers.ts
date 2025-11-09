@@ -2,20 +2,20 @@ import { useState, useEffect } from "react";
 import { userService } from "../services/userService";
 import type { Profile } from "../types/database";
 
-export const useFriends = () => {
-	const [friends, setFriends] = useState<Profile[]>([]);
+export const useUsers = () => {
+	const [users, setUsers] = useState<Profile[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		loadFriends();
+		loadUsers();
 	}, []);
 
-	const loadFriends = async () => {
+	const loadUsers = async () => {
 		try {
 			setLoading(true);
-			const data = await userService.getFriends();
-			setFriends(data);
+			const data = await userService.getAllUsers();
+			setUsers(data);
 			setError(null);
 		} catch (err: any) {
 			setError(err.message);
@@ -34,5 +34,5 @@ export const useFriends = () => {
 		}
 	};
 
-	return { friends, loading, error, searchUsers, reload: loadFriends };
+	return { users, loading, error, searchUsers, reload: loadUsers };
 };

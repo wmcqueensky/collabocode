@@ -88,7 +88,7 @@ const InvitePlayersStep = ({
 		};
 	}, []);
 
-	// Combine friends and search results
+	// Use search results if searching, otherwise show all available players
 	const displayPlayers =
 		searchQuery.trim().length >= 2 ? searchResults : availablePlayers;
 
@@ -278,10 +278,8 @@ const InvitePlayersStep = ({
 					searchQuery.length < 2 && (
 						<div className="text-center py-10 text-gray-400">
 							<Users size={48} className="mx-auto mb-3 opacity-50" />
-							<p>No friends found</p>
-							<p className="text-sm mt-2">
-								Try searching for users to invite them
-							</p>
+							<p>No users found</p>
+							<p className="text-sm mt-2">Try searching for specific users</p>
 						</div>
 					)}
 

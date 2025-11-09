@@ -11,7 +11,7 @@ import InvitePlayersStep from "./components/steps/InvitePlayersStep";
 
 // Hooks and Services
 import { useProblems } from "../../../../../hooks/useProblems";
-import { useFriends } from "../../../../../hooks/useFriends";
+import { useUsers } from "../../../../../hooks/useUsers";
 import { sessionService } from "../../../../../services/sessionService";
 import type { Problem, Profile } from "../../../../../types/database";
 
@@ -29,7 +29,7 @@ const CompetitionModal = ({ isOpen, onClose }: CompetitionModalProps) => {
 		loading: problemsLoading,
 		error: problemsError,
 	} = useProblems();
-	const { friends, loading: friendsLoading, searchUsers } = useFriends();
+	const { users, loading: usersLoading, searchUsers } = useUsers();
 
 	// State
 	const [step, setStep] = useState(1);
@@ -183,10 +183,10 @@ const CompetitionModal = ({ isOpen, onClose }: CompetitionModalProps) => {
 							selectedLanguage={selectedLanguage}
 							selectedPlayers={selectedPlayers}
 							setSelectedPlayers={setSelectedPlayers}
-							availablePlayers={friends}
+							availablePlayers={users}
 							playerCount={playerCount}
 							timeLimit={timeLimit}
-							loading={friendsLoading}
+							loading={usersLoading}
 							searchUsers={searchUsers}
 						/>
 					)}
