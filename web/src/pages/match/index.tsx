@@ -9,6 +9,7 @@ import { MonacoEditor } from "./editor/MonacoEditor";
 import Footer from "./layout/Footer";
 import { RaceTrack } from "./chat/RaceTrack";
 import { RecentActivities } from "./chat/RecentActivities";
+import { WaitingLobby } from "./lobby/WaitingLobby";
 
 import { useSession } from "../../hooks/useSession";
 import { sessionService } from "../../services/sessionService";
@@ -86,6 +87,9 @@ export default function MatchPage() {
 	// Current user
 	const [currentUserId, setCurrentUserId] = useState<string>("");
 
+	// Check if we should show waiting lobby
+	const [showWaitingLobby, setShowWaitingLobby] = useState(true);
+
 	// Load current user
 	useEffect(() => {
 		const loadUser = async () => {
@@ -101,9 +105,47 @@ export default function MatchPage() {
 		loadUser();
 	}, [navigate]);
 
+	// Check session status and participants
+	useEffect(() => {
+		if (!session || !dbParticipants || !currentUserId) return;
+
+		// Check if session has started
+		if (session.status === "in_progress") {
+			setShowWaitingLobby(false);
+			return;
+		}
+
+		// Check if all invited players have responded
+		const allResponded = dbParticipants.every(
+			(p) => p.status === "joined" || p.status === "declined"
+		);
+
+		// Check if current user has joined
+		const currentParticipant = dbParticipants.find(
+			(p) => p.user_id === currentUserId
+		);
+
+		// If session is waiting and not all players joined, show lobby
+		if (session.status === "waiting") {
+			setShowWaitingLobby(true);
+		}
+	}, [session, dbParticipants, currentUserId]);
+
+	// Handle starting the session (only for host)
+	const handleStartSession = async () => {
+		if (!session || !sessionId) return;
+
+		try {
+			await updateStatus("in_progress");
+			setShowWaitingLobby(false);
+		} catch (error) {
+			console.error("Error starting session:", error);
+		}
+	};
+
 	// Load session data
 	useEffect(() => {
-		if (!session) return;
+		if (!session || showWaitingLobby) return;
 
 		// Set language
 		setLanguage(session.language);
@@ -141,27 +183,29 @@ export default function MatchPage() {
 
 			setTimerStarted(true);
 		}
-	}, [session]);
+	}, [session, showWaitingLobby]);
 
 	// Transform DB participants to UI participants
 	useEffect(() => {
 		if (!dbParticipants || !currentUserId) return;
 
-		const transformed = dbParticipants.map((p, index) => {
-			const isCurrentUser = p.user_id === currentUserId;
-			const progress = p.is_correct
-				? 100
-				: (p.test_results?.passedCount || 0) * 25; // Estimate progress
+		const transformed = dbParticipants
+			.filter((p) => p.status === "joined") // Only show joined participants
+			.map((p, index) => {
+				const isCurrentUser = p.user_id === currentUserId;
+				const progress = p.is_correct
+					? 100
+					: (p.test_results?.passedCount || 0) * 25; // Estimate progress
 
-			return {
-				id: p.user_id,
-				name: isCurrentUser ? "You" : p.user?.username || "Player",
-				progress,
-				status: "idle" as const,
-				finishPosition: p.ranking || null,
-				isCorrect: p.is_correct || false,
-			};
-		});
+				return {
+					id: p.user_id,
+					name: isCurrentUser ? "You" : p.user?.username || "Player",
+					progress,
+					status: "idle" as const,
+					finishPosition: p.ranking || null,
+					isCorrect: p.is_correct || false,
+				};
+			});
 
 		setParticipants(transformed);
 	}, [dbParticipants, currentUserId]);
@@ -191,49 +235,45 @@ export default function MatchPage() {
 
 	// Subscribe to real-time participant updates
 	useEffect(() => {
-		if (!sessionId) return;
+		if (!sessionId || showWaitingLobby) return;
 
 		const channel = supabase
-			.channel(`session:${sessionId}`)
+			.channel(`session-activities:${sessionId}`)
 			.on(
 				"postgres_changes",
 				{
-					event: "*",
+					event: "UPDATE",
 					schema: "public",
 					table: "session_participants",
 					filter: `session_id=eq.${sessionId}`,
 				},
 				(payload) => {
-					console.log("Participant update:", payload);
+					console.log("Participant activity update:", payload);
 
-					// Add activity for participant updates
-					if (payload.eventType === "UPDATE") {
-						const participant = payload.new as any;
-						const user = dbParticipants?.find(
-							(p) => p.user_id === participant.user_id
-						);
+					const participant = payload.new as any;
+					const user = dbParticipants?.find(
+						(p) => p.user_id === participant.user_id
+					);
 
-						if (
-							participant.is_correct &&
-							participant.user_id !== currentUserId
-						) {
-							addActivity({
-								type: "submitted",
-								message: `${
-									user?.user?.username || "Player"
-								} completed the problem!`,
-								timestamp: "now",
-							});
-						}
+					if (participant.is_correct && participant.user_id !== currentUserId) {
+						addActivity({
+							type: "submitted",
+							message: `${
+								user?.user?.username || "Player"
+							} completed the problem!`,
+							timestamp: "now",
+						});
 					}
 				}
 			)
-			.subscribe();
+			.subscribe((status) => {
+				console.log("Activities subscription status:", status);
+			});
 
 		return () => {
-			channel.unsubscribe();
+			supabase.removeChannel(channel);
 		};
-	}, [sessionId, dbParticipants, currentUserId]);
+	}, [sessionId, dbParticipants, currentUserId, showWaitingLobby]);
 
 	// Add activity helper
 	const addActivity = (activity: Omit<Activity, "id">) => {
@@ -507,6 +547,18 @@ export default function MatchPage() {
 					Back to Explore
 				</button>
 			</div>
+		);
+	}
+
+	// Show waiting lobby if session hasn't started
+	if (showWaitingLobby && dbParticipants) {
+		return (
+			<WaitingLobby
+				session={session}
+				participants={dbParticipants}
+				currentUserId={currentUserId}
+				onStartSession={handleStartSession}
+			/>
 		);
 	}
 

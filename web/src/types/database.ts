@@ -47,7 +47,7 @@ export interface SessionParticipant {
 	id: string;
 	session_id: string;
 	user_id: string;
-	status: "invited" | "joined" | "declined" | "left";
+	status: "invited" | "declined" | "left" | "joined" | "active";
 	code_snapshot: string | null;
 	submission_time: string | null;
 	test_results: any;

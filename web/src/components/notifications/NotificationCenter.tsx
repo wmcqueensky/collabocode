@@ -28,10 +28,15 @@ const NotificationCenter = () => {
 				data: { user },
 			} = await supabase.auth.getUser();
 
-			if (!user) return;
+			if (!user) {
+				console.warn("No user found, skipping notification subscription");
+				return;
+			}
+
+			console.log("Setting up notification subscription for user:", user.id);
 
 			const channel = supabase
-				.channel(`user-invites:${user.id}`)
+				.channel(`user-invites-${user.id}-${Date.now()}`)
 				.on(
 					"postgres_changes",
 					{
@@ -41,12 +46,10 @@ const NotificationCenter = () => {
 						filter: `user_id=eq.${user.id}`,
 					},
 					async (payload) => {
-						console.log("New invitation received:", payload);
+						console.log("🔔 New invitation received:", payload);
 
-						// Small delay to ensure database transaction is complete
-						setTimeout(async () => {
-							await loadNotifications();
-						}, 100);
+						// Reload notifications immediately
+						await loadNotifications();
 
 						// Show browser notification if permitted
 						if (Notification.permission === "granted") {
@@ -66,31 +69,38 @@ const NotificationCenter = () => {
 						filter: `user_id=eq.${user.id}`,
 					},
 					async (payload) => {
-						console.log("Participant status updated:", payload);
+						console.log("🔔 Participant status updated:", payload);
 						// Reload notifications to update the list
-						setTimeout(async () => {
-							await loadNotifications();
-						}, 100);
+						await loadNotifications();
 					}
 				)
 				.subscribe((status) => {
-					console.log("Subscription status:", status);
+					console.log("📡 Notification subscription status:", status);
 					if (status === "SUBSCRIBED") {
-						console.log("Successfully subscribed to notifications channel");
+						console.log("✅ Successfully subscribed to notifications channel");
+					} else if (status === "CHANNEL_ERROR") {
+						console.error("❌ Subscription error - retrying...");
+						// Retry subscription after a delay
+						setTimeout(() => setupSubscription(), 2000);
+					} else if (status === "TIMED_OUT") {
+						console.error("⏱️ Subscription timed out - retrying...");
+						setTimeout(() => setupSubscription(), 2000);
 					}
 				});
 
 			return () => {
+				console.log("Cleaning up notification subscription");
 				supabase.removeChannel(channel);
 			};
 		};
 
 		const cleanup = setupSubscription();
 
-		// Also set up periodic polling as backup (every 10 seconds)
+		// Also set up periodic polling as backup (every 30 seconds)
 		const pollInterval = setInterval(() => {
+			console.log("Polling for notifications (backup)");
 			loadNotifications();
-		}, 10000);
+		}, 30000);
 
 		return () => {
 			cleanup.then((cleanupFn) => cleanupFn && cleanupFn());
