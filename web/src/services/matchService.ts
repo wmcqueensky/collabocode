@@ -43,8 +43,7 @@ export const matchService = {
 		for (const participant of joinedParticipants) {
 			const result = participant.ranking === 1 ? "win" : "loss";
 			const ratingChange = this.calculateEloRatingChange(
-				participant.ranking || 999,
-				joinedParticipants.length
+				participant.ranking || 999
 			);
 
 			// Insert match history
@@ -75,7 +74,7 @@ export const matchService = {
 	},
 
 	// Calculate ELO-style rating change
-	calculateEloRatingChange(ranking: number, totalPlayers: number): number {
+	calculateEloRatingChange(ranking: number): number {
 		// Winner gets +10, loser gets -10 (simplified ELO)
 		if (ranking === 1) {
 			return 10;

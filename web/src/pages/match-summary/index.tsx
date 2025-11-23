@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
 	ArrowLeft,
 	Award,
-	CheckCircle,
 	Clock,
 	Code,
 	Trophy,
 	User,
 	AlertTriangle,
 	Cpu,
-	BarChart2,
 	Loader2,
 } from "lucide-react";
 import {
@@ -20,8 +18,6 @@ import {
 	CartesianGrid,
 	Tooltip,
 	ResponsiveContainer,
-	LineChart,
-	Line,
 	Legend,
 	RadarChart,
 	PolarGrid,
@@ -154,15 +150,15 @@ export default function MatchSummaryPage() {
 		);
 	}
 
-	const complexityColors: Record<string, string> = {
-		"O(1)": "text-green-400",
-		"O(log n)": "text-green-400",
-		"O(n)": "text-yellow-400",
-		"O(n log n)": "text-yellow-400",
-		"O(n²)": "text-orange-400",
-		"O(2^n)": "text-red-400",
-		"O(n!)": "text-red-500",
-	};
+	// const complexityColors: Record<string, string> = {
+	// 	"O(1)": "text-green-400",
+	// 	"O(log n)": "text-green-400",
+	// 	"O(n)": "text-yellow-400",
+	// 	"O(n log n)": "text-yellow-400",
+	// 	"O(n²)": "text-orange-400",
+	// 	"O(2^n)": "text-red-400",
+	// 	"O(n!)": "text-red-500",
+	// };
 
 	const timePerformanceData = summaryData.players
 		.map((player: any) => ({

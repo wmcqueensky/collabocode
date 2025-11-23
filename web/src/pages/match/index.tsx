@@ -401,7 +401,7 @@ export default function MatchPage() {
 			if (testIndex === "all") {
 				// Run all test cases
 				const results = await Promise.all(
-					testCases.map(async (testCase, index) => {
+					testCases.map(async (testCase) => {
 						const result = await executeCode(
 							code,
 							language,
