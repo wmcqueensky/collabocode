@@ -7,6 +7,8 @@ import CollaborationPage from "../pages/collaboration";
 import ExplorePage from "../pages/explore";
 import MatchSummaryPage from "../pages/match-summary";
 import CollaborationSummaryPage from "../pages/collaboration-summary";
+import SettingsPage from "../pages/settings";
+import ProfilePage from "../pages/profile";
 import {
 	HOME_PATH,
 	EXPLORE_PATH,
@@ -14,6 +16,8 @@ import {
 	COLLABORATION_PATH,
 	MATCH_SUMMARY_PATH,
 	COLLABORATION_SUMMARY_PATH,
+	PROFILE_PATH,
+	SETTINGS_PATH,
 } from "./paths";
 
 const Router = () => (
@@ -24,6 +28,8 @@ const Router = () => (
 
 		<Route element={<MainLayout />}>
 			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
+			<Route path={SETTINGS_PATH} element={<SettingsPage />} />
+			<Route path={PROFILE_PATH} element={<ProfilePage />} />
 			<Route
 				path={COLLABORATION_SUMMARY_PATH}
 				element={<CollaborationSummaryPage />}

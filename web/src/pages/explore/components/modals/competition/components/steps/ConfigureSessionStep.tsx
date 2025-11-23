@@ -34,7 +34,7 @@ const ConfigureSessionStep = ({
 		{ id: "rust", name: "Rust" },
 	];
 
-	const availableTimeLimits = [15, 30, 45, 60, 90, 120];
+	const availableTimeLimits = [3, 5, 10, 15, 30, 60];
 	const availablePlayerCounts = [2, 3, 4];
 
 	const getDifficultyColor = (difficulty: any) => {

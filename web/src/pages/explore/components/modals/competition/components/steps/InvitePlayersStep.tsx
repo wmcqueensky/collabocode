@@ -353,7 +353,7 @@ const InvitePlayersStep = ({
 								<div className="mt-2 flex items-center justify-between text-xs text-gray-400">
 									<div>
 										<span className="inline-block mr-3">
-											⭐ {player.rating || 1500} Rating
+											⭐ {player.rating || 1000} Rating
 										</span>
 										<span className="inline-block">
 											🏆 {player.problems_solved || 0} Problems
