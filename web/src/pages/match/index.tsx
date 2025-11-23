@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { PlayCircle, Mic } from "lucide-react";
 import { OutputPanel } from "./editor/OutputPanel";
 import { ProblemPanel } from "./problem-panel/ProblemPanel";
 import { Navbar } from "./layout/Navbar";
@@ -10,12 +9,12 @@ import Footer from "./layout/Footer";
 import { RaceTrack } from "./chat/RaceTrack";
 import { RecentActivities } from "./chat/RecentActivities";
 import { WaitingLobby } from "./lobby/WaitingLobby";
+import { SubmissionModal } from "./modals/SubmissionModal";
 
 import { useSession } from "../../hooks/useSession";
-import { sessionService } from "../../services/sessionService";
+import { matchCompletionService } from "../../services/matchCompletionService";
 import { supabase } from "../../lib/supabase";
 import { executeCode } from "../../services/judge0Service";
-import type { Profile } from "../../types/database";
 
 interface TestCase {
 	input: any;
@@ -28,7 +27,7 @@ interface Participant {
 	id: string;
 	name: string;
 	progress: number;
-	status: "idle" | "typing" | "thinking";
+	status: "idle" | "typing" | "thinking" | "complete";
 	finishPosition: number | null;
 	isCorrect: boolean;
 }
@@ -90,6 +89,17 @@ export default function MatchPage() {
 	// Check if we should show waiting lobby
 	const [showWaitingLobby, setShowWaitingLobby] = useState(true);
 
+	// Submission modal state
+	const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+	const [submissionResult, setSubmissionResult] = useState<{
+		allPassed: boolean;
+		passedCount: number;
+		totalCount: number;
+	} | null>(null);
+
+	// Track if user has already submitted
+	const [hasSubmitted, setHasSubmitted] = useState(false);
+
 	// Load current user
 	useEffect(() => {
 		const loadUser = async () => {
@@ -115,10 +125,11 @@ export default function MatchPage() {
 			return;
 		}
 
-		// Check if all invited players have responded
-		const allResponded = dbParticipants.every(
-			(p) => p.status === "joined" || p.status === "declined"
-		);
+		// If session is completed, redirect to explore
+		if (session.status === "completed") {
+			navigate("/explore");
+			return;
+		}
 
 		// Check if current user has joined
 		const currentParticipant = dbParticipants.find(
@@ -129,7 +140,12 @@ export default function MatchPage() {
 		if (session.status === "waiting") {
 			setShowWaitingLobby(true);
 		}
-	}, [session, dbParticipants, currentUserId]);
+
+		// Check if current user has already submitted
+		if (currentParticipant?.submission_time) {
+			setHasSubmitted(true);
+		}
+	}, [session, dbParticipants, currentUserId, navigate]);
 
 	// Handle starting the session (only for host)
 	const handleStartSession = async () => {
@@ -191,24 +207,34 @@ export default function MatchPage() {
 
 		const transformed = dbParticipants
 			.filter((p) => p.status === "joined") // Only show joined participants
-			.map((p, index) => {
+			.map((p) => {
 				const isCurrentUser = p.user_id === currentUserId;
-				const progress = p.is_correct
-					? 100
-					: (p.test_results?.passedCount || 0) * 25; // Estimate progress
+
+				// Calculate progress based on test results
+				const testResults = p.test_results || {};
+				const passedCount = testResults.passedCount || 0;
+				const totalCount = testResults.totalCount || testCases.length;
+
+				// Calculate progress percentage
+				let progress = 0;
+				if (p.is_correct) {
+					progress = 100; // Completed
+				} else if (totalCount > 0) {
+					progress = (passedCount / totalCount) * 100;
+				}
 
 				return {
 					id: p.user_id,
 					name: isCurrentUser ? "You" : p.user?.username || "Player",
 					progress,
-					status: "idle" as const,
+					status: p.is_correct ? ("complete" as const) : ("idle" as const),
 					finishPosition: p.ranking || null,
 					isCorrect: p.is_correct || false,
 				};
 			});
 
 		setParticipants(transformed);
-	}, [dbParticipants, currentUserId]);
+	}, [dbParticipants, currentUserId, testCases.length]);
 
 	// Timer countdown
 	useEffect(() => {
@@ -222,7 +248,7 @@ export default function MatchPage() {
 				setTimeStr(`${minutes}:${secs.toString().padStart(2, "0")}`);
 
 				// Auto-submit when time runs out
-				if (newSeconds === 0) {
+				if (newSeconds === 0 && !hasSubmitted) {
 					handleSubmit();
 				}
 
@@ -231,7 +257,7 @@ export default function MatchPage() {
 		}, 1000);
 
 		return () => clearInterval(timer);
-	}, [timerStarted, seconds]);
+	}, [timerStarted, seconds, hasSubmitted]);
 
 	// Subscribe to real-time participant updates
 	useEffect(() => {
@@ -275,6 +301,85 @@ export default function MatchPage() {
 		};
 	}, [sessionId, dbParticipants, currentUserId, showWaitingLobby]);
 
+	// Subscribe to real-time test activities
+	useEffect(() => {
+		if (!sessionId || showWaitingLobby) return;
+
+		const channel = supabase
+			.channel(`session-test-activities:${sessionId}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "UPDATE",
+					schema: "public",
+					table: "session_participants",
+					filter: `session_id=eq.${sessionId}`,
+				},
+				(payload) => {
+					console.log("Test activity update:", payload);
+
+					const participant = payload.new as any;
+					const oldParticipant = payload.old as any;
+
+					// Don't show activities for current user
+					if (participant.user_id === currentUserId) return;
+
+					const user = dbParticipants?.find(
+						(p) => p.user_id === participant.user_id
+					);
+					const username = user?.user?.username || "Player";
+
+					// Check for test results changes
+					const oldResults = oldParticipant.test_results || {};
+					const newResults = participant.test_results || {};
+
+					if (newResults.passedCount !== oldResults.passedCount) {
+						const passedCount = newResults.passedCount || 0;
+						const totalCount = newResults.totalCount || 0;
+
+						addActivity({
+							type: "ran",
+							message: `${username} ran tests (${passedCount}/${totalCount} passed)`,
+							timestamp: "now",
+						});
+					}
+
+					// Check for submission
+					if (participant.submission_time && !oldParticipant.submission_time) {
+						if (participant.is_correct) {
+							addActivity({
+								type: "submitted",
+								message: `${username} completed the problem! ✅`,
+								timestamp: "now",
+							});
+						} else {
+							addActivity({
+								type: "submitted",
+								message: `${username} submitted their solution`,
+								timestamp: "now",
+							});
+						}
+					}
+				}
+			)
+			.subscribe((status) => {
+				console.log("Test activities subscription status:", status);
+			});
+
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [sessionId, dbParticipants, currentUserId, showWaitingLobby]);
+
+	// Set up auto-finalization when all participants submit (but don't navigate)
+	useEffect(() => {
+		if (!sessionId || showWaitingLobby) return;
+
+		const cleanup = matchCompletionService.setupAutoFinalization(sessionId);
+
+		return cleanup;
+	}, [sessionId, showWaitingLobby]);
+
 	// Add activity helper
 	const addActivity = (activity: Omit<Activity, "id">) => {
 		setActivities((prev) => [
@@ -291,15 +396,6 @@ export default function MatchPage() {
 		if (!session?.problem) return;
 
 		setOutput([{ message: "Running tests...", status: "normal" }]);
-
-		// Add activity
-		addActivity({
-			type: "ran",
-			message: `You ran Test Case ${
-				testIndex === "all" ? "All" : testIndex + 1
-			}`,
-			timestamp: "now",
-		});
 
 		try {
 			if (testIndex === "all") {
@@ -346,11 +442,28 @@ export default function MatchPage() {
 
 				setOutput(newOutput);
 
-				// Update progress
-				const progress = Math.round((passedCount / results.length) * 100);
+				// Update progress in database for real-time sync (without submission_time)
+				await submitCode(code, {
+					passedCount,
+					totalCount: results.length,
+					results: results.map((r) => r.status === "pass"),
+				});
+
+				// Update local progress
 				setParticipants((prev) =>
-					prev.map((p) => (p.id === currentUserId ? { ...p, progress } : p))
+					prev.map((p) =>
+						p.id === currentUserId
+							? { ...p, progress: (passedCount / results.length) * 100 }
+							: p
+					)
 				);
+
+				// Add activity
+				addActivity({
+					type: "ran",
+					message: `You ran all test cases (${passedCount}/${results.length} passed)`,
+					timestamp: "now",
+				});
 			} else {
 				// Run single test case
 				const testCase = testCases[testIndex];
@@ -416,33 +529,38 @@ export default function MatchPage() {
 		runTest("all");
 	};
 
-	// Handle Submit button
+	// Handle Submit button - UPDATED LOGIC
 	const handleSubmit = async () => {
-		if (!sessionId || !session) return;
+		if (!sessionId || !session || hasSubmitted) return;
 
 		setOutput([{ message: "Submitting solution...", status: "normal" }]);
 
 		try {
-			// Run all tests first
+			// Run all tests first with error handling
 			const results = await Promise.all(
 				testCases.map(async (testCase) => {
-					const result = await executeCode(
-						code,
-						language,
-						JSON.stringify(testCase.input)
-					);
+					try {
+						const result = await executeCode(
+							code,
+							language,
+							JSON.stringify(testCase.input)
+						);
 
-					return (
-						result.status === "success" &&
-						result.output?.trim() === JSON.stringify(testCase.output)
-					);
+						return (
+							result.status === "success" &&
+							result.output?.trim() === JSON.stringify(testCase.output)
+						);
+					} catch (error) {
+						console.error("Error executing test case:", error);
+						return false;
+					}
 				})
 			);
 
 			const allPassed = results.every((r) => r);
 			const passedCount = results.filter((r) => r).length;
 
-			// Submit to database
+			// Submit to database - THIS TRIGGERS THE BACKGROUND PROCESS
 			await submitCode(code, {
 				allPassed,
 				passedCount,
@@ -450,26 +568,20 @@ export default function MatchPage() {
 				results,
 			});
 
-			// Update output
-			setOutput([
-				{ message: "Validating solution...", status: "normal" },
-				{ message: "Running test cases...", status: "normal" },
-				{
-					message: `✓ ${passedCount}/${results.length} test cases passed`,
-					status: allPassed ? "pass" : "fail",
-				},
-				...(allPassed
-					? [
-							{ message: "✓ Solution accepted!", status: "pass" },
-							{ message: "✓ All tests passed successfully", status: "pass" },
-					  ]
-					: [
-							{ message: "✗ Some tests failed", status: "fail" },
-							{ message: "Please review and try again", status: "normal" },
-					  ]),
-			]);
+			// Mark as submitted
+			setHasSubmitted(true);
 
-			// Update participant progress
+			// Store submission result for modal
+			setSubmissionResult({
+				allPassed,
+				passedCount,
+				totalCount: results.length,
+			});
+
+			// Show modal
+			setShowSubmissionModal(true);
+
+			// Update local participant progress
 			setParticipants((prev) =>
 				prev.map((p) =>
 					p.id === currentUserId
@@ -477,7 +589,7 @@ export default function MatchPage() {
 								...p,
 								progress: 100,
 								isCorrect: allPassed,
-								finishPosition: allPassed ? 1 : null,
+								status: "complete",
 						  }
 						: p
 				)
@@ -492,19 +604,49 @@ export default function MatchPage() {
 				timestamp: "now",
 			});
 
-			// If all passed, navigate to summary after delay
-			if (allPassed) {
-				setTimeout(() => {
-					navigate(`/match-summary/${sessionId}`);
-				}, 2000);
-			}
+			// Update output for display
+			setOutput([
+				{ message: "✓ Solution submitted successfully!", status: "pass" },
+				{
+					message: `${passedCount}/${results.length} test cases passed`,
+					status: allPassed ? "pass" : "fail",
+				},
+				{
+					message: "You'll be notified when all players submit their solutions",
+					status: "normal",
+				},
+			]);
+
+			// NOTE: We do NOT check for completion or navigate here
+			// The background listener will handle finalization
+			// The notification will allow navigation to summary page
 		} catch (error: any) {
 			console.error("Error submitting:", error);
-			setOutput([
-				{ message: "Error submitting solution", status: "fail" },
-				{ message: error.message || "Unknown error", status: "fail" },
-			]);
+			setHasSubmitted(false);
+
+			// Handle rate limit errors
+			if (error.message?.includes("429")) {
+				setOutput([
+					{ message: "⚠️ Rate limit exceeded", status: "fail" },
+					{
+						message:
+							"Judge0 API has reached its rate limit. Please try again in a few moments.",
+						status: "normal",
+					},
+				]);
+			} else {
+				setOutput([
+					{ message: "Error submitting solution", status: "fail" },
+					{ message: error.message || "Unknown error", status: "fail" },
+				]);
+			}
 		}
+	};
+
+	// Handle modal close - navigate to explore
+	const handleModalClose = () => {
+		setShowSubmissionModal(false);
+		navigate("/explore");
 	};
 
 	// Update code
@@ -573,6 +715,17 @@ export default function MatchPage() {
 
 	return (
 		<div className="flex flex-col h-screen bg-[#171717] text-gray-200">
+			{/* Submission Modal */}
+			{submissionResult && (
+				<SubmissionModal
+					isOpen={showSubmissionModal}
+					onClose={handleModalClose}
+					allPassed={submissionResult.allPassed}
+					passedCount={submissionResult.passedCount}
+					totalCount={submissionResult.totalCount}
+				/>
+			)}
+
 			{/* Navbar */}
 			<Navbar
 				time={timeStr}

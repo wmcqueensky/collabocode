@@ -5,9 +5,10 @@ import { supabase } from "../../../lib/supabase";
 type Message = {
 	id: string;
 	user_id: string;
+	session_id: string;
 	username: string;
 	message: string;
-	timestamp: string;
+	created_at: string;
 };
 
 type ChatPanelProps = {
@@ -45,35 +46,68 @@ export const ChatPanel = ({
 		loadUser();
 	}, []);
 
-	// Subscribe to messages
+	// Load existing messages from database
 	useEffect(() => {
 		if (!sessionId) return;
 
-		// Subscribe to broadcast channel for messages
-		const channel = supabase.channel(`chat:${sessionId}`);
+		const loadMessages = async () => {
+			const { data, error } = await supabase
+				.from("chat_messages")
+				.select("*")
+				.eq("session_id", sessionId)
+				.order("created_at", { ascending: true });
 
-		channel
-			.on("broadcast", { event: "message" }, (payload: any) => {
-				console.log("New message:", payload);
-				// Add message from broadcast (including echoed back messages)
-				setMessages((prev) => {
-					// Check if message already exists to prevent duplicates
-					const exists = prev.some((msg) => msg.id === payload.payload.id);
-					if (exists) return prev;
-					return [...prev, payload.payload];
-				});
+			if (error) {
+				console.error("Error loading messages:", error);
+			} else if (data) {
+				setMessages(data);
 				scrollToBottom();
-			})
+			}
+		};
+
+		loadMessages();
+	}, [sessionId]);
+
+	// Subscribe to new messages
+	useEffect(() => {
+		if (!sessionId) return;
+
+		const channel = supabase
+			.channel(`chat:${sessionId}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "INSERT",
+					schema: "public",
+					table: "chat_messages",
+					filter: `session_id=eq.${sessionId}`,
+				},
+				(payload) => {
+					console.log("New message:", payload);
+					const newMessage = payload.new as Message;
+
+					setMessages((prev) => {
+						// Avoid duplicates
+						if (prev.some((msg) => msg.id === newMessage.id)) {
+							return prev;
+						}
+						return [...prev, newMessage];
+					});
+					scrollToBottom();
+				}
+			)
 			.subscribe();
 
 		return () => {
-			channel.unsubscribe();
+			supabase.removeChannel(channel);
 		};
 	}, [sessionId]);
 
 	// Auto-scroll to bottom
 	const scrollToBottom = () => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+		setTimeout(() => {
+			messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+		}, 100);
 	};
 
 	useEffect(() => {
@@ -86,27 +120,19 @@ export const ChatPanel = ({
 
 		if (!inputMessage.trim() || !sessionId) return;
 
-		const message: Message = {
-			id: `${Date.now()}-${currentUserId}`,
-			user_id: currentUserId,
-			username: currentUsername,
-			message: inputMessage.trim(),
-			timestamp: new Date().toISOString(),
-		};
-
-		// Add message to local state immediately
-		setMessages((prev) => [...prev, message]);
-		setInputMessage("");
-		scrollToBottom();
-
-		// Broadcast message to others
 		try {
-			const channel = supabase.channel(`chat:${sessionId}`);
-			await channel.send({
-				type: "broadcast",
-				event: "message",
-				payload: message,
+			const { error } = await supabase.from("chat_messages").insert({
+				session_id: sessionId,
+				user_id: currentUserId,
+				username: currentUsername,
+				message: inputMessage.trim(),
 			});
+
+			if (error) {
+				console.error("Error sending message:", error);
+			} else {
+				setInputMessage("");
+			}
 		} catch (error) {
 			console.error("Error sending message:", error);
 		}
@@ -115,7 +141,6 @@ export const ChatPanel = ({
 	// Toggle mic
 	const toggleMic = () => {
 		setIsMicOn(!isMicOn);
-		// TODO: Implement actual voice chat functionality
 	};
 
 	return (
@@ -149,7 +174,7 @@ export const ChatPanel = ({
 				) : (
 					messages.map((msg) => {
 						const isCurrentUser = msg.user_id === currentUserId;
-						const time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
+						const time = new Date(msg.created_at).toLocaleTimeString("en-US", {
 							hour: "2-digit",
 							minute: "2-digit",
 						});

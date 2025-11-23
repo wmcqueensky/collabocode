@@ -1,5 +1,3 @@
-// components/match/layout/Navbar.tsx
-import React from "react";
 import { Users, Clock, PlayCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -20,10 +18,7 @@ export const Navbar = ({
 	time,
 	handleRun,
 	handleSubmit,
-	activePanel,
-	setActivePanel,
 	isMobileMenuOpen,
-	setIsMobileMenuOpen,
 	problemTitle = "Problem",
 	participantCount = 0,
 	maxParticipants = 4,

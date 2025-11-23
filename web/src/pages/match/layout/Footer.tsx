@@ -1,13 +1,6 @@
-"use client";
-import React from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
-const Footer = ({
-	isChatOpen,
-	setIsChatOpen,
-	activePanel,
-	setActivePanel,
-}: any) => {
+const Footer = ({ isChatOpen, setIsChatOpen }: any) => {
 	return (
 		<footer className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-2 bg-[#2c2c2c] border-t border-gray-700 text-xs text-gray-400">
 			<div className="flex items-center space-x-2 sm:space-x-4">

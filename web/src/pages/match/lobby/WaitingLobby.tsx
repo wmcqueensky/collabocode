@@ -7,11 +7,7 @@ import {
 	XCircle,
 	Loader2,
 } from "lucide-react";
-import type {
-	Session,
-	SessionParticipant,
-	Profile,
-} from "../../../../types/database";
+import type { Session, SessionParticipant } from "../../../types/database";
 
 interface WaitingLobbyProps {
 	session: Session;

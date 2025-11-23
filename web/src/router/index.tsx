@@ -7,7 +7,6 @@ import CollaborationPage from "../pages/collaboration";
 import ExplorePage from "../pages/explore";
 import MatchSummaryPage from "../pages/match-summary";
 import CollaborationSummaryPage from "../pages/collaboration-summary";
-
 import {
 	HOME_PATH,
 	EXPLORE_PATH,
@@ -25,7 +24,6 @@ const Router = () => (
 
 		<Route element={<MainLayout />}>
 			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
-			<Route path={MATCH_SUMMARY_PATH} element={<MatchSummaryPage />} />
 			<Route
 				path={COLLABORATION_SUMMARY_PATH}
 				element={<CollaborationSummaryPage />}
@@ -35,6 +33,10 @@ const Router = () => (
 
 		<Route path={`${MATCH_PATH}/:sessionId`} element={<MatchPage />} />
 		<Route path={MATCH_PATH} element={<MatchPage />} />
+		<Route
+			path={`${MATCH_SUMMARY_PATH}/:sessionId`}
+			element={<MatchSummaryPage />}
+		/>
 
 		<Route path="*" element={<Navigate to={HOME_PATH} />} />
 	</Routes>

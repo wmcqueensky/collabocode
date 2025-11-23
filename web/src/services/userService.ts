@@ -178,4 +178,19 @@ export const userService = {
 	// 	if (error) throw error;
 	// 	return data;
 	// },
+
+	// Get multiple profiles by IDs
+	async getProfilesByIds(userIds: string[]): Promise<Profile[]> {
+		const { data, error } = await supabase
+			.from("profiles")
+			.select("*")
+			.in("id", userIds);
+
+		if (error) {
+			console.error("Error fetching profiles:", error);
+			return [];
+		}
+
+		return data || [];
+	},
 };

@@ -30,23 +30,24 @@ export const matchService = {
 		}
 	},
 
-	// Record match history
+	// Record match history and update ratings
 	async recordMatchHistory(sessionId: string): Promise<void> {
 		const session = await sessionService.getSessionById(sessionId);
 		if (!session) return;
 
 		const participants = await sessionService.getSessionParticipants(sessionId);
-		// const winner = participants.find((p) => p.ranking === 1);
+		const joinedParticipants = participants.filter(
+			(p) => p.status === "joined"
+		);
 
-		for (const participant of participants) {
-			if (participant.status !== "joined") continue;
-
+		for (const participant of joinedParticipants) {
 			const result = participant.ranking === 1 ? "win" : "loss";
-			const ratingChange = this.calculateRatingChange(
+			const ratingChange = this.calculateEloRatingChange(
 				participant.ranking || 999,
-				participants.length
+				joinedParticipants.length
 			);
 
+			// Insert match history
 			await supabase.from("match_history").insert({
 				user_id: participant.user_id,
 				session_id: sessionId,
@@ -73,10 +74,101 @@ export const matchService = {
 		}
 	},
 
-	// Calculate rating change based on ranking
-	calculateRatingChange(ranking: number, totalPlayers: number): number {
-		const basePoints = 50;
-		const multiplier = (totalPlayers - ranking + 1) / totalPlayers;
-		return Math.round(basePoints * multiplier * (ranking === 1 ? 2 : 1));
+	// Calculate ELO-style rating change
+	calculateEloRatingChange(ranking: number, totalPlayers: number): number {
+		// Winner gets +10, loser gets -10 (simplified ELO)
+		if (ranking === 1) {
+			return 10;
+		} else {
+			return -10;
+		}
+	},
+
+	// Get match summary data
+	async getMatchSummary(sessionId: string): Promise<any> {
+		const session = await sessionService.getSessionById(sessionId);
+		if (!session) throw new Error("Session not found");
+
+		const participants = await sessionService.getSessionParticipants(sessionId);
+
+		// Get profiles with updated ratings
+		const participantsWithData = await Promise.all(
+			participants
+				.filter((p) => p.status === "joined")
+				.map(async (p) => {
+					const profile = await userService.getProfileById(p.user_id);
+
+					// Calculate test case pass rate
+					const testResults = p.test_results || {};
+					const passedCount = testResults.passedCount || 0;
+					const totalCount = testResults.totalCount || 0;
+					const passRate =
+						totalCount > 0 ? (passedCount / totalCount) * 100 : 0;
+
+					// Parse submission time
+					const submissionTime = p.submission_time
+						? new Date(p.submission_time).toLocaleTimeString("en-US", {
+								hour: "2-digit",
+								minute: "2-digit",
+						  })
+						: "N/A";
+
+					// Calculate time taken (in minutes)
+					const timeTaken =
+						session.started_at && p.submission_time
+							? Math.floor(
+									(new Date(p.submission_time).getTime() -
+										new Date(session.started_at).getTime()) /
+										60000
+							  )
+							: 0;
+
+					return {
+						name: profile?.username || "Unknown",
+						avatar: profile?.avatar_url || null,
+						rank: p.ranking || 999,
+						timeToSolve: timeTaken,
+						timeComplexity: "O(n)", // You can enhance this with actual complexity analysis
+						spaceComplexity: "O(1)", // You can enhance this with actual complexity analysis
+						passedTestCases: Math.round(passRate),
+						codeQualityScore: passRate, // Simplified - can be enhanced
+						bestPracticeScore: passRate,
+						optimizationScore: passRate,
+						readabilityScore: passRate,
+						submissionTime,
+						solutionApproach: "User Solution",
+						initial: (profile?.username || "U").charAt(0).toUpperCase(),
+						bgColor:
+							p.ranking === 1
+								? "#FF6B6B"
+								: p.ranking === 2
+								? "#FFD93D"
+								: "#6BCB77",
+						textColor: p.ranking === 1 ? "text-white" : "text-gray-900",
+						isCorrect: p.is_correct,
+						userId: p.user_id,
+					};
+				})
+		);
+
+		return {
+			problemName: session.problem?.title || "Problem",
+			difficulty: session.problem?.difficulty || "Medium",
+			totalParticipants: participantsWithData.length,
+			winner: participantsWithData.find((p) => p.rank === 1)?.name || "N/A",
+			problemDescription: session.problem?.description || "",
+			players: participantsWithData.sort((a, b) => a.rank - b.rank),
+			session,
+		};
+	},
+
+	// Check if all participants have submitted
+	async checkAllSubmitted(sessionId: string): Promise<boolean> {
+		const participants = await sessionService.getSessionParticipants(sessionId);
+		const joinedParticipants = participants.filter(
+			(p) => p.status === "joined"
+		);
+
+		return joinedParticipants.every((p) => p.submission_time !== null);
 	},
 };
