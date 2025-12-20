@@ -7,8 +7,9 @@ import {
 	Trophy,
 	User,
 	AlertTriangle,
-	Cpu,
+	Zap,
 	Loader2,
+	CheckCircle,
 } from "lucide-react";
 import {
 	BarChart,
@@ -18,25 +19,11 @@ import {
 	CartesianGrid,
 	Tooltip,
 	ResponsiveContainer,
-	Legend,
-	RadarChart,
-	PolarGrid,
-	PolarAngleAxis,
-	PolarRadiusAxis,
-	Radar,
 	Cell,
 } from "recharts";
 import { useParams, useNavigate } from "react-router-dom";
 import { matchService } from "../../services/matchService";
 import { sessionService } from "../../services/sessionService";
-
-const COLORS = ["#FF6B6B", "#FFD93D", "#6BCB77", "#e44dff"];
-const RADAR_COLORS = [
-	"rgba(255, 107, 107, 0.6)",
-	"rgba(255, 217, 61, 0.6)",
-	"rgba(107, 203, 119, 0.6)",
-	"rgba(228, 77, 255, 0.6)",
-];
 
 export default function MatchSummaryPage() {
 	const { sessionId } = useParams<{ sessionId: string }>();
@@ -150,31 +137,25 @@ export default function MatchSummaryPage() {
 		);
 	}
 
-	// const complexityColors: Record<string, string> = {
-	// 	"O(1)": "text-green-400",
-	// 	"O(log n)": "text-green-400",
-	// 	"O(n)": "text-yellow-400",
-	// 	"O(n log n)": "text-yellow-400",
-	// 	"O(n²)": "text-orange-400",
-	// 	"O(2^n)": "text-red-400",
-	// 	"O(n!)": "text-red-500",
-	// };
-
+	// Prepare time performance data with MM:SS format
 	const timePerformanceData = summaryData.players
+		.filter((p: any) => p.timeToSolve > 0)
 		.map((player: any) => ({
 			name: player.name,
 			time: player.timeToSolve,
+			formattedTime: player.formattedTime,
 			fill:
-				player.timeToSolve <= 15
+				player.timeToSolve <= 900 // 15 minutes
 					? "#6BCB77"
-					: player.timeToSolve <= 20
+					: player.timeToSolve <= 1200 // 20 minutes
 					? "#FFD93D"
-					: player.timeToSolve <= 25
+					: player.timeToSolve <= 1500 // 25 minutes
 					? "#ffa726"
 					: "#FF6B6B",
 		}))
 		.sort((a: any, b: any) => a.time - b.time);
 
+	// Prepare code quality data
 	const codeQualityData = summaryData.players
 		.map((player: any) => ({
 			name: player.name,
@@ -189,36 +170,6 @@ export default function MatchSummaryPage() {
 					: "#FF6B6B",
 		}))
 		.sort((a: any, b: any) => b.score - a.score);
-
-	const radarChartData = [
-		{
-			subject: "Speed",
-			...summaryData.players.reduce((acc: any, player: any, idx: number) => {
-				acc[String.fromCharCode(65 + idx)] =
-					player.timeToSolve > 0
-						? Math.max(0, 100 - player.timeToSolve * 3)
-						: 0;
-				return acc;
-			}, {}),
-			fullMark: 100,
-		},
-		{
-			subject: "Test Coverage",
-			...summaryData.players.reduce((acc: any, player: any, idx: number) => {
-				acc[String.fromCharCode(65 + idx)] = player.passedTestCases;
-				return acc;
-			}, {}),
-			fullMark: 100,
-		},
-		{
-			subject: "Code Quality",
-			...summaryData.players.reduce((acc: any, player: any, idx: number) => {
-				acc[String.fromCharCode(65 + idx)] = player.codeQualityScore;
-				return acc;
-			}, {}),
-			fullMark: 100,
-		},
-	];
 
 	return (
 		<div className="min-h-screen bg-[#171717] text-gray-200">
@@ -265,12 +216,10 @@ export default function MatchSummaryPage() {
 							<Award className="text-[#5bc6ca] mr-1" size={20} />
 							<span>Winner: {summaryData.winner}</span>
 						</div>
-						{summaryData.players[0]?.timeToSolve > 0 && (
+						{summaryData.winnerTime && summaryData.winnerTime !== "N/A" && (
 							<div className="flex items-center">
 								<Clock className="text-[#5bc6ca] mr-1" size={20} />
-								<span>
-									Best Time: {summaryData.players[0].timeToSolve} minutes
-								</span>
+								<span>Best Time: {summaryData.winnerTime}</span>
 							</div>
 						)}
 					</div>
@@ -290,7 +239,7 @@ export default function MatchSummaryPage() {
 									<th className="py-2 px-3 text-left">Player</th>
 									<th className="py-2 px-3 text-center">Time</th>
 									<th className="py-2 px-3 text-center">Tests Passed</th>
-									<th className="py-2 px-3 text-center">Quality Score</th>
+									<th className="py-2 px-3 text-center">Complexity</th>
 									<th className="py-2 px-3 text-center">Rating Change</th>
 								</tr>
 							</thead>
@@ -333,53 +282,124 @@ export default function MatchSummaryPage() {
 											</div>
 										</td>
 										<td className="py-3 px-3 text-center">
-											{player.timeToSolve > 0
-												? `${player.timeToSolve} mins`
-												: "N/A"}
+											{player.formattedTime !== "0:00" ? (
+												<span className="font-mono">
+													{player.formattedTime}
+												</span>
+											) : (
+												"N/A"
+											)}
 										</td>
 										<td className="py-3 px-3 text-center">
-											<span
-												className={
-													player.passedTestCases === 100
-														? "text-[#6BCB77]"
-														: "text-yellow-400"
-												}
-											>
-												{player.passedTestCases}%
-											</span>
-										</td>
-										<td className="py-3 px-3 text-center">
-											<div className="w-full bg-gray-600 rounded-full h-2">
-												<div
-													className={`h-2 rounded-full ${
-														player.codeQualityScore >= 90
-															? "bg-[#6BCB77]"
-															: player.codeQualityScore >= 85
-															? "bg-[#FFD93D]"
-															: player.codeQualityScore >= 80
-															? "bg-[#ffa726]"
-															: "bg-[#FF6B6B]"
-													}`}
-													style={{ width: `${player.codeQualityScore}%` }}
-												></div>
+											<div className="flex flex-col items-center">
+												<span
+													className={
+														player.passedTestCases === 100
+															? "text-[#6BCB77] font-medium"
+															: "text-yellow-400 font-medium"
+													}
+												>
+													{player.passedTestCases}%
+												</span>
+												<span className="text-xs text-gray-500">
+													{player.passedTestCount}/{player.totalTestCount}
+												</span>
 											</div>
-											<span className="text-xs">
-												{Math.round(player.codeQualityScore)}/100
-											</span>
 										</td>
 										<td className="py-3 px-3 text-center">
-											<span
-												className={
-													player.rank === 1 ? "text-green-400" : "text-red-400"
-												}
-											>
-												{player.rank === 1 ? "+10" : "-10"}
-											</span>
+											<div className="flex flex-col items-center text-xs">
+												<span className="text-yellow-400">
+													T: {player.timeComplexity}
+												</span>
+												<span className="text-green-400">
+													S: {player.spaceComplexity}
+												</span>
+											</div>
+										</td>
+										<td className="py-3 px-3 text-center">
+											<div className="flex flex-col items-center">
+												<span
+													className={
+														player.ratingChange > 0
+															? "text-green-400 font-medium"
+															: "text-red-400 font-medium"
+													}
+												>
+													{player.ratingChange > 0 ? "+" : ""}
+													{player.ratingChange}
+												</span>
+												<span className="text-xs text-gray-500">
+													{player.previousRating} → {player.currentRating}
+												</span>
+											</div>
 										</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
+					</div>
+				</div>
+
+				{/* Stats Grid */}
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+					{/* Average Test Pass Rate Per User */}
+					<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
+						<div className="flex items-center justify-between mb-2">
+							<h4 className="text-sm text-gray-400">Avg Tests Per User</h4>
+							<CheckCircle className="text-[#5bc6ca]" size={20} />
+						</div>
+						<div className="text-3xl font-bold text-white">
+							{(
+								summaryData.players.reduce(
+									(sum: number, p: any) => sum + p.passedTestCount,
+									0
+								) / summaryData.players.length
+							).toFixed(1)}
+							{" / "}
+							{(
+								summaryData.players.reduce(
+									(sum: number, p: any) => sum + p.totalTestCount,
+									0
+								) / summaryData.players.length
+							).toFixed(1)}
+						</div>
+						<div className="text-xs text-gray-500 mt-1">
+							tests solved per player on average
+						</div>
+					</div>
+
+					{/* Fastest Solution */}
+					<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
+						<div className="flex items-center justify-between mb-2">
+							<h4 className="text-sm text-gray-400">Fastest Solution</h4>
+							<Zap className="text-[#FFD93D]" size={20} />
+						</div>
+						<div className="text-3xl font-bold text-white font-mono">
+							{summaryData.winnerTime}
+						</div>
+						<div className="text-xs text-gray-500 mt-1">
+							by {summaryData.winner}
+						</div>
+					</div>
+
+					{/* Success Rate */}
+					<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
+						<div className="flex items-center justify-between mb-2">
+							<h4 className="text-sm text-gray-400">Completion Rate</h4>
+							<Trophy className="text-[#6BCB77]" size={20} />
+						</div>
+						<div className="text-3xl font-bold text-white">
+							{Math.round(
+								(summaryData.players.filter((p: any) => p.isCorrect).length /
+									summaryData.players.length) *
+									100
+							)}
+							%
+						</div>
+						<div className="text-xs text-gray-500 mt-1">
+							{summaryData.players.filter((p: any) => p.isCorrect).length} /{" "}
+							{summaryData.players.length} solved correctly
+						</div>
 					</div>
 				</div>
 
@@ -396,7 +416,7 @@ export default function MatchSummaryPage() {
 								<BarChart
 									data={timePerformanceData}
 									layout="vertical"
-									margin={{ top: 5, right: 30, left: 50, bottom: 10 }}
+									margin={{ top: 5, right: 30, left: 70, bottom: 10 }}
 								>
 									<CartesianGrid strokeDasharray="3 3" stroke="#444" />
 									<XAxis
@@ -404,7 +424,7 @@ export default function MatchSummaryPage() {
 										stroke="#999"
 										domain={[0, "auto"]}
 										label={{
-											value: "Minutes to Solve",
+											value: "Time (seconds)",
 											position: "insideBottom",
 											offset: -5,
 											fill: "#999",
@@ -417,9 +437,14 @@ export default function MatchSummaryPage() {
 											borderColor: "#555",
 											color: "white",
 										}}
-										formatter={(value) => [`${value} mins`, "Time"]}
+										formatter={(value, name) => {
+											const entry = timePerformanceData.find(
+												(d: any) => d.time === value
+											);
+											return [entry?.formattedTime || value, "Time"];
+										}}
 									/>
-									<Bar dataKey="time" name="Minutes" radius={[0, 4, 4, 0]}>
+									<Bar dataKey="time" name="Time" radius={[0, 4, 4, 0]}>
 										{timePerformanceData.map((entry: any, index: number) => (
 											<Cell key={`cell-${index}`} fill={entry.fill} />
 										))}
@@ -429,7 +454,7 @@ export default function MatchSummaryPage() {
 						</div>
 					</div>
 
-					{/* Code Quality Chart */}
+					{/* Test Pass Rate Chart */}
 					<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
 						<h3 className="text-xl font-semibold mb-4 flex items-center">
 							<Code className="mr-2 text-[#5bc6ca]" size={20} />
@@ -440,7 +465,7 @@ export default function MatchSummaryPage() {
 								<BarChart
 									data={codeQualityData}
 									layout="vertical"
-									margin={{ top: 5, right: 30, left: 50, bottom: 10 }}
+									margin={{ top: 5, right: 30, left: 70, bottom: 10 }}
 								>
 									<CartesianGrid strokeDasharray="3 3" stroke="#444" />
 									<XAxis
@@ -463,7 +488,7 @@ export default function MatchSummaryPage() {
 										}}
 										formatter={(value) => [`${value}%`, "Pass Rate"]}
 									/>
-									<Bar dataKey="score" name="Quality" radius={[0, 4, 4, 0]}>
+									<Bar dataKey="score" name="Pass Rate" radius={[0, 4, 4, 0]}>
 										{codeQualityData.map((entry: any, index: number) => (
 											<Cell key={`cell-${index}`} fill={entry.fill} />
 										))}
@@ -474,42 +499,259 @@ export default function MatchSummaryPage() {
 					</div>
 				</div>
 
-				{/* Radar Chart */}
+				{/* Performance Comparison Table */}
 				<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md mb-6 border border-gray-700">
 					<h3 className="text-xl font-semibold mb-4 flex items-center">
-						<Cpu className="mr-2 text-[#5bc6ca]" size={20} />
-						Performance Analysis
+						<Award className="mr-2 text-[#5bc6ca]" size={20} />
+						Detailed Performance Comparison
 					</h3>
-					<div className="h-80">
-						<ResponsiveContainer width="100%" height="100%">
-							<RadarChart outerRadius={100} data={radarChartData}>
-								<PolarGrid strokeDasharray="3 3" stroke="#444" />
-								<PolarAngleAxis dataKey="subject" tick={{ fill: "#999" }} />
-								<PolarRadiusAxis
-									angle={30}
-									domain={[0, 100]}
-									tick={{ fill: "#999" }}
-								/>
-								{summaryData.players.map((player: any, idx: number) => (
-									<Radar
+
+					<div className="overflow-x-auto">
+						<table className="w-full">
+							<thead>
+								<tr className="border-b border-gray-600">
+									<th className="py-3 px-4 text-left text-gray-400 font-medium">
+										Player
+									</th>
+									<th className="py-3 px-4 text-center text-gray-400 font-medium">
+										<div className="flex flex-col items-center">
+											<Clock size={16} className="mb-1" />
+											<span>Time</span>
+										</div>
+									</th>
+									<th className="py-3 px-4 text-center text-gray-400 font-medium">
+										<div className="flex flex-col items-center">
+											<CheckCircle size={16} className="mb-1" />
+											<span>Tests Passed</span>
+										</div>
+									</th>
+									<th className="py-3 px-4 text-center text-gray-400 font-medium">
+										<div className="flex flex-col items-center">
+											<Zap size={16} className="mb-1" />
+											<span>Time Complexity</span>
+										</div>
+									</th>
+									<th className="py-3 px-4 text-center text-gray-400 font-medium">
+										<div className="flex flex-col items-center">
+											<Code size={16} className="mb-1" />
+											<span>Space Complexity</span>
+										</div>
+									</th>
+									<th className="py-3 px-4 text-center text-gray-400 font-medium">
+										<div className="flex flex-col items-center">
+											<Trophy size={16} className="mb-1" />
+											<span>Rating Change</span>
+										</div>
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{summaryData.players.map((player: any, index: number) => (
+									<tr
 										key={player.userId}
-										name={player.name}
-										dataKey={String.fromCharCode(65 + idx)}
-										stroke={COLORS[idx % COLORS.length]}
-										fill={RADAR_COLORS[idx % RADAR_COLORS.length]}
-										fillOpacity={0.6}
-									/>
+										className={`border-b border-gray-700 ${
+											index === 0 ? "bg-[#5bc6ca]/10" : ""
+										}`}
+									>
+										{/* Player Name & Rank */}
+										<td className="py-4 px-4">
+											<div className="flex items-center gap-3">
+												<div className="flex items-center gap-2">
+													{index === 0 && (
+														<Trophy size={18} className="text-[#FFD93D]" />
+													)}
+													{index === 1 && (
+														<Trophy size={18} className="text-gray-300" />
+													)}
+													{index === 2 && (
+														<Trophy size={18} className="text-amber-700" />
+													)}
+													<span className="text-gray-400 font-mono">
+														#{player.rank}
+													</span>
+												</div>
+												<div
+													className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${player.textColor}`}
+													style={{ backgroundColor: player.bgColor }}
+												>
+													{player.initial}
+												</div>
+												<span className="font-medium text-white">
+													{player.name}
+												</span>
+											</div>
+										</td>
+
+										{/* Time */}
+										<td className="py-4 px-4 text-center">
+											<div className="flex flex-col items-center">
+												<span className="font-mono text-lg text-white">
+													{player.formattedTime !== "0:00"
+														? player.formattedTime
+														: "N/A"}
+												</span>
+												{player.formattedTime !== "0:00" && (
+													<span className="text-xs text-gray-500 mt-1">
+														{player.timeToSolve}s
+													</span>
+												)}
+											</div>
+										</td>
+
+										{/* Tests Passed */}
+										<td className="py-4 px-4 text-center">
+											<div className="flex flex-col items-center gap-2">
+												{/* Progress bar */}
+												<div className="w-full max-w-[120px] bg-gray-700 rounded-full h-2">
+													<div
+														className={`h-2 rounded-full transition-all ${
+															player.passedTestCases === 100
+																? "bg-[#6BCB77]"
+																: player.passedTestCases >= 50
+																? "bg-[#FFD93D]"
+																: "bg-[#FF6B6B]"
+														}`}
+														style={{ width: `${player.passedTestCases}%` }}
+													/>
+												</div>
+												{/* Numbers */}
+												<div className="flex items-center gap-2">
+													<span
+														className={`font-medium ${
+															player.passedTestCases === 100
+																? "text-[#6BCB77]"
+																: "text-yellow-400"
+														}`}
+													>
+														{player.passedTestCount}/{player.totalTestCount}
+													</span>
+													<span className="text-xs text-gray-500">
+														({player.passedTestCases}%)
+													</span>
+												</div>
+											</div>
+										</td>
+
+										{/* Time Complexity */}
+										<td className="py-4 px-4 text-center">
+											<span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full font-mono text-sm">
+												{player.timeComplexity}
+											</span>
+										</td>
+
+										{/* Space Complexity */}
+										<td className="py-4 px-4 text-center">
+											<span className="inline-block px-3 py-1 bg-green-500/20 text-green-400 rounded-full font-mono text-sm">
+												{player.spaceComplexity}
+											</span>
+										</td>
+
+										{/* Rating Change */}
+										<td className="py-4 px-4 text-center">
+											<div className="flex flex-col items-center gap-1">
+												<div className="flex items-center gap-1">
+													<span className="text-gray-500 text-sm">
+														{player.previousRating}
+													</span>
+													<span className="text-gray-600">→</span>
+													<span className="text-white font-medium">
+														{player.currentRating}
+													</span>
+												</div>
+												<span
+													className={`text-sm font-bold ${
+														player.ratingChange > 0
+															? "text-green-400"
+															: "text-red-400"
+													}`}
+												>
+													{player.ratingChange > 0 ? "+" : ""}
+													{player.ratingChange}
+												</span>
+											</div>
+										</td>
+									</tr>
 								))}
-								<Legend />
-								<Tooltip
-									contentStyle={{
-										backgroundColor: "#2c2c2c",
-										borderColor: "#555",
-										color: "white",
-									}}
+							</tbody>
+						</table>
+					</div>
+
+					{/* Legend */}
+					<div className="mt-6 pt-6 border-t border-gray-700">
+						<h4 className="text-sm font-medium text-gray-300 mb-3">
+							Understanding the Metrics:
+						</h4>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+							<div className="flex items-start gap-2">
+								<Clock
+									size={16}
+									className="text-[#5bc6ca] mt-0.5 flex-shrink-0"
 								/>
-							</RadarChart>
-						</ResponsiveContainer>
+								<div>
+									<span className="text-gray-300 font-medium">Time:</span>
+									<span className="text-gray-400 ml-1">
+										How long it took to submit the solution (MM:SS format)
+									</span>
+								</div>
+							</div>
+							<div className="flex items-start gap-2">
+								<CheckCircle
+									size={16}
+									className="text-[#5bc6ca] mt-0.5 flex-shrink-0"
+								/>
+								<div>
+									<span className="text-gray-300 font-medium">
+										Tests Passed:
+									</span>
+									<span className="text-gray-400 ml-1">
+										Number of test cases successfully passed
+									</span>
+								</div>
+							</div>
+							<div className="flex items-start gap-2">
+								<Zap
+									size={16}
+									className="text-[#5bc6ca] mt-0.5 flex-shrink-0"
+								/>
+								<div>
+									<span className="text-gray-300 font-medium">
+										Time Complexity:
+									</span>
+									<span className="text-gray-400 ml-1">
+										Big-O notation for algorithm efficiency (e.g., O(n), O(log
+										n))
+									</span>
+								</div>
+							</div>
+							<div className="flex items-start gap-2">
+								<Code
+									size={16}
+									className="text-[#5bc6ca] mt-0.5 flex-shrink-0"
+								/>
+								<div>
+									<span className="text-gray-300 font-medium">
+										Space Complexity:
+									</span>
+									<span className="text-gray-400 ml-1">
+										Memory usage of the algorithm (e.g., O(1), O(n))
+									</span>
+								</div>
+							</div>
+							<div className="flex items-start gap-2">
+								<Trophy
+									size={16}
+									className="text-[#5bc6ca] mt-0.5 flex-shrink-0"
+								/>
+								<div>
+									<span className="text-gray-300 font-medium">
+										Correctness:
+									</span>
+									<span className="text-gray-400 ml-1">
+										Whether all test cases passed successfully
+									</span>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 			</main>

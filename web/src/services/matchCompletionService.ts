@@ -54,14 +54,44 @@ export const matchCompletionService = {
 				sessionId
 			);
 
+			// IMPORTANT: Refresh participants data before calculating rankings
+			// This ensures we have the latest is_correct values
+			console.log("🔄 Refreshing participant data before ranking...");
+			const freshParticipants = await sessionService.getSessionParticipants(
+				sessionId
+			);
+			console.log(
+				"📊 Fresh participants data:",
+				freshParticipants.map((p) => ({
+					user_id: p.user_id,
+					is_correct: p.is_correct,
+					submission_time: p.submission_time,
+					ranking: p.ranking,
+				}))
+			);
+
+			// Calculate rankings with fresh data
+			console.log("📊 Calculating rankings...");
+			await matchService.calculateRankings(sessionId);
+			console.log("✅ Rankings calculated");
+
+			// Verify rankings were set
+			const rankedParticipants = await sessionService.getSessionParticipants(
+				sessionId
+			);
+			console.log(
+				"📊 After ranking:",
+				rankedParticipants.map((p) => ({
+					user_id: p.user_id,
+					is_correct: p.is_correct,
+					ranking: p.ranking,
+				}))
+			);
+
 			// Update session status with atomic operation
 			console.log("🔄 Attempting to update session status to completed...");
 
-			const {
-				data: updateData,
-				error: statusError,
-				count,
-			} = await supabase
+			const { data: updateData, error: statusError } = await supabase
 				.from("sessions")
 				.update({
 					status: "completed",
@@ -74,7 +104,6 @@ export const matchCompletionService = {
 			console.log("📊 Update result:", {
 				data: updateData,
 				error: statusError,
-				count: count,
 				dataLength: updateData?.length,
 			});
 
@@ -117,11 +146,6 @@ export const matchCompletionService = {
 			}
 
 			console.log("✅ Session status verified as completed");
-
-			// Calculate rankings
-			console.log("📊 Calculating rankings...");
-			await matchService.calculateRankings(sessionId);
-			console.log("✅ Rankings calculated");
 
 			// Record match history and update ratings
 			console.log("📝 Recording match history...");

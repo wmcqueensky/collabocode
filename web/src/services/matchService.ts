@@ -7,13 +7,16 @@ export const matchService = {
 	async calculateRankings(sessionId: string): Promise<void> {
 		const participants = await sessionService.getSessionParticipants(sessionId);
 
-		// Sort by: is_correct (true first), then by submission_time
+		// Sort by: is_correct (true first), then by submission_time (earlier is better)
 		const ranked = participants
 			.filter((p) => p.status === "joined")
 			.sort((a, b) => {
+				// First priority: correctness (true before false)
 				if (a.is_correct !== b.is_correct) {
 					return a.is_correct ? -1 : 1;
 				}
+
+				// Second priority: submission time (earlier is better)
 				if (!a.submission_time || !b.submission_time) return 0;
 				return (
 					new Date(a.submission_time).getTime() -
@@ -21,7 +24,17 @@ export const matchService = {
 				);
 			});
 
-		// Update rankings
+		console.log(
+			"📊 Ranked participants:",
+			ranked.map((p) => ({
+				user_id: p.user_id,
+				is_correct: p.is_correct,
+				submission_time: p.submission_time,
+				new_ranking: ranked.indexOf(p) + 1,
+			}))
+		);
+
+		// Update rankings (1 = best, 2 = second, etc.)
 		for (let i = 0; i < ranked.length; i++) {
 			await supabase
 				.from("session_participants")
@@ -112,25 +125,42 @@ export const matchService = {
 						  })
 						: "N/A";
 
-					// Calculate time taken (in minutes)
-					const timeTaken =
+					// Calculate time taken (in seconds)
+					const timeInSeconds =
 						session.started_at && p.submission_time
 							? Math.floor(
 									(new Date(p.submission_time).getTime() -
 										new Date(session.started_at).getTime()) /
-										60000
+										1000
 							  )
 							: 0;
+
+					// Format time as MM:SS
+					const minutes = Math.floor(timeInSeconds / 60);
+					const seconds = timeInSeconds % 60;
+					const formattedTime = `${minutes}:${seconds
+						.toString()
+						.padStart(2, "0")}`;
+
+					// Get previous rating (current rating minus the change)
+					const currentRating = profile?.rating || 1500;
+					// Use actual ranking from database, fallback to 999 if null
+					const actualRanking = p.ranking || 999;
+					const ratingChange = actualRanking === 1 ? 10 : -10;
+					const previousRating = currentRating - ratingChange;
 
 					return {
 						name: profile?.username || "Unknown",
 						avatar: profile?.avatar_url || null,
-						rank: p.ranking || 999,
-						timeToSolve: timeTaken,
-						timeComplexity: "O(n)", // You can enhance this with actual complexity analysis
-						spaceComplexity: "O(1)", // You can enhance this with actual complexity analysis
+						rank: actualRanking,
+						timeToSolve: timeInSeconds,
+						formattedTime: formattedTime,
+						timeComplexity: "O(n)", // Placeholder - can be enhanced
+						spaceComplexity: "O(1)", // Placeholder - can be enhanced
 						passedTestCases: Math.round(passRate),
-						codeQualityScore: passRate, // Simplified - can be enhanced
+						passedTestCount: passedCount,
+						totalTestCount: totalCount,
+						codeQualityScore: passRate,
 						bestPracticeScore: passRate,
 						optimizationScore: passRate,
 						readabilityScore: passRate,
@@ -138,25 +168,44 @@ export const matchService = {
 						solutionApproach: "User Solution",
 						initial: (profile?.username || "U").charAt(0).toUpperCase(),
 						bgColor:
-							p.ranking === 1
+							actualRanking === 1
 								? "#FF6B6B"
-								: p.ranking === 2
+								: actualRanking === 2
 								? "#FFD93D"
 								: "#6BCB77",
-						textColor: p.ranking === 1 ? "text-white" : "text-gray-900",
+						textColor: actualRanking === 1 ? "text-white" : "text-gray-900",
 						isCorrect: p.is_correct,
 						userId: p.user_id,
+						currentRating: currentRating,
+						previousRating: previousRating,
+						ratingChange: ratingChange,
 					};
 				})
 		);
+
+		// Sort by rank (1, 2, 3, etc.) - lowest rank number is best
+		const sortedPlayers = participantsWithData.sort((a, b) => a.rank - b.rank);
+
+		// Winner is the player with rank 1
+		const winner = sortedPlayers.find((p) => p.rank === 1);
+
+		console.log("🏆 Match Summary:", {
+			players: sortedPlayers.map((p) => ({
+				name: p.name,
+				rank: p.rank,
+				isCorrect: p.isCorrect,
+			})),
+			winner: winner?.name,
+		});
 
 		return {
 			problemName: session.problem?.title || "Problem",
 			difficulty: session.problem?.difficulty || "Medium",
 			totalParticipants: participantsWithData.length,
-			winner: participantsWithData.find((p) => p.rank === 1)?.name || "N/A",
+			winner: winner?.name || "N/A",
+			winnerTime: winner?.formattedTime || "N/A",
 			problemDescription: session.problem?.description || "",
-			players: participantsWithData.sort((a, b) => a.rank - b.rank),
+			players: sortedPlayers,
 			session,
 		};
 	},
