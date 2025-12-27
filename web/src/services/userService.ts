@@ -115,25 +115,6 @@ export const userService = {
 		return data || [];
 	},
 
-	// // Search for users by username or full name
-	// async searchUsers(query: string): Promise<Profile[]> {
-	// 	const {
-	// 		data: { user },
-	// 	} = await supabase.auth.getUser();
-	// 	if (!user) throw new Error("Not authenticated");
-
-	// 	const { data, error } = await supabase
-	// 		.from("profiles")
-	// 		.select("*")
-	// 		.neq("id", user.id)
-	// 		.or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-	// 		.order("username")
-	// 		.limit(20);
-
-	// 	if (error) throw error;
-	// 	return data || [];
-	// },
-
 	// Get user profile by ID
 	async getUserProfile(userId: string): Promise<Profile | null> {
 		const { data, error } = await supabase
@@ -162,22 +143,6 @@ export const userService = {
 		if (error) throw error;
 		return data;
 	},
-
-	// Update user profile
-	// async updateProfile(
-	// 	userId: string,
-	// 	updates: Partial<Profile>
-	// ): Promise<Profile> {
-	// 	const { data, error } = await supabase
-	// 		.from("profiles")
-	// 		.update(updates)
-	// 		.eq("id", userId)
-	// 		.select()
-	// 		.single();
-
-	// 	if (error) throw error;
-	// 	return data;
-	// },
 
 	// Get multiple profiles by IDs
 	async getProfilesByIds(userIds: string[]): Promise<Profile[]> {
