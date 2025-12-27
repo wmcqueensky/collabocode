@@ -1,33 +1,70 @@
 import { supabase } from "../lib/supabase";
 import { matchService } from "./matchService";
-import { sessionService } from "./sessionService";
 
+/**
+ * Match Completion Service
+ * Handles the finalization of matches including rankings, history, and notifications
+ * Uses atomic operations and proper synchronization to prevent race conditions
+ */
 export const matchCompletionService = {
-	// Global listener - doesn't require being on match page
+	// Global listener reference
 	globalCompletionListener: null as any,
 
-	// Track which sessions are currently being processed to prevent race conditions
-	processingSessionsSet: new Set<string>(),
+	// Track which sessions are currently being processed
+	processingSessionsMap: new Map<string, number>(),
 
-	// Check if all participants have submitted and finalize match
+	// Lock timeout in milliseconds (30 seconds)
+	LOCK_TIMEOUT: 30000,
+
+	/**
+	 * Acquire a processing lock for a session
+	 */
+	acquireLock(sessionId: string): boolean {
+		const now = Date.now();
+		const existingLock = this.processingSessionsMap.get(sessionId);
+
+		if (existingLock && now - existingLock < this.LOCK_TIMEOUT) {
+			console.log(
+				`🔒 Session ${sessionId} is already being processed (lock age: ${
+					now - existingLock
+				}ms)`
+			);
+			return false;
+		}
+
+		this.processingSessionsMap.set(sessionId, now);
+		console.log(`🔒 Acquired lock for session ${sessionId}`);
+		return true;
+	},
+
+	/**
+	 * Release a processing lock for a session
+	 */
+	releaseLock(sessionId: string): void {
+		this.processingSessionsMap.delete(sessionId);
+		console.log(`🔓 Released lock for session ${sessionId}`);
+	},
+
+	/**
+	 * Check if all participants have submitted and finalize match
+	 */
 	async checkAndFinalizeMatch(sessionId: string): Promise<boolean> {
+		// Try to acquire lock
+		if (!this.acquireLock(sessionId)) {
+			return false;
+		}
+
 		try {
-			// Prevent duplicate processing with atomic check
-			if (this.processingSessionsSet.has(sessionId)) {
-				console.log("Session already being processed:", sessionId);
-				return false;
-			}
+			console.log("🏁 Starting match finalization check for:", sessionId);
 
-			// First check session status to avoid duplicate processing
-			const session = await sessionService.getSessionById(sessionId);
+			// Step 1: Get session status directly from DB
+			const { data: session, error: sessionError } = await supabase
+				.from("sessions")
+				.select("id, status, problem_id")
+				.eq("id", sessionId)
+				.single();
 
-			console.log("📊 Session status check:", {
-				sessionId,
-				status: session?.status,
-				found: !!session,
-			});
-
-			if (!session) {
+			if (sessionError || !session) {
 				console.log("❌ Session not found:", sessionId);
 				return false;
 			}
@@ -37,7 +74,12 @@ export const matchCompletionService = {
 				return false;
 			}
 
-			// Check if all participants have submitted
+			if (session.status !== "in_progress") {
+				console.log("⏳ Session not in progress:", session.status);
+				return false;
+			}
+
+			// Step 2: Check if all participants have submitted
 			const allSubmitted = await matchService.checkAllSubmitted(sessionId);
 
 			if (!allSubmitted) {
@@ -45,194 +87,180 @@ export const matchCompletionService = {
 				return false;
 			}
 
-			// Mark as processing
-			this.processingSessionsSet.add(sessionId);
-			console.log("🔒 Acquired processing lock for session:", sessionId);
+			console.log("✅ All participants submitted, starting finalization...");
 
-			console.log(
-				"✅ All participants submitted, finalizing match:",
-				sessionId
-			);
-
-			// IMPORTANT: Refresh participants data before calculating rankings
-			// This ensures we have the latest is_correct values
-			console.log("🔄 Refreshing participant data before ranking...");
-			const freshParticipants = await sessionService.getSessionParticipants(
-				sessionId
-			);
-			console.log(
-				"📊 Fresh participants data:",
-				freshParticipants.map((p) => ({
-					user_id: p.user_id,
-					is_correct: p.is_correct,
-					submission_time: p.submission_time,
-					ranking: p.ranking,
-				}))
-			);
-
-			// Calculate rankings with fresh data
-			console.log("📊 Calculating rankings...");
-			await matchService.calculateRankings(sessionId);
-			console.log("✅ Rankings calculated");
-
-			// Verify rankings were set
-			const rankedParticipants = await sessionService.getSessionParticipants(
-				sessionId
-			);
-			console.log(
-				"📊 After ranking:",
-				rankedParticipants.map((p) => ({
-					user_id: p.user_id,
-					is_correct: p.is_correct,
-					ranking: p.ranking,
-				}))
-			);
-
-			// Update session status with atomic operation
-			console.log("🔄 Attempting to update session status to completed...");
-
-			const { data: updateData, error: statusError } = await supabase
+			// Step 3: Acquire database lock by setting status to 'completing'
+			const { data: lockData, error: lockError } = await supabase
 				.from("sessions")
-				.update({
-					status: "completed",
-					ended_at: new Date().toISOString(),
-				})
+				.update({ status: "completing" })
 				.eq("id", sessionId)
-				.eq("status", "in_progress") // Only update if still in progress
+				.eq("status", "in_progress")
 				.select();
 
-			console.log("📊 Update result:", {
-				data: updateData,
-				error: statusError,
-				dataLength: updateData?.length,
-			});
-
-			if (statusError) {
-				console.error("❌ Error updating session status:", statusError);
-				this.processingSessionsSet.delete(sessionId);
+			if (lockError || !lockData || lockData.length === 0) {
+				console.log(
+					"⚠️ Could not acquire database lock - session may be processed elsewhere"
+				);
 				return false;
 			}
 
-			// Check if the update actually affected any rows
-			if (!updateData || updateData.length === 0) {
-				console.error("❌ Session status update affected 0 rows");
-				console.log("This means either:");
-				console.log("1. Session doesn't exist");
-				console.log("2. Status was already 'completed'");
-				console.log("3. Status is not 'in_progress'");
+			console.log("🔒 Database lock acquired via 'completing' status");
 
-				// Let's verify the current status
-				const currentSession = await sessionService.getSessionById(sessionId);
-				console.log("Current session status:", currentSession?.status);
+			try {
+				// Step 4: Calculate rankings
+				console.log("📊 Calculating rankings...");
+				await matchService.calculateRankings(sessionId);
+				console.log("✅ Rankings calculated");
 
-				this.processingSessionsSet.delete(sessionId);
-				return false;
+				// Step 5: Small delay to ensure DB commits
+				await new Promise((resolve) => setTimeout(resolve, 200));
+
+				// Step 6: Verify rankings are set
+				const { data: rankedParticipants } = await supabase
+					.from("session_participants")
+					.select("id, user_id, ranking, is_correct")
+					.eq("session_id", sessionId)
+					.eq("status", "joined");
+
+				console.log("📊 Verified rankings:", rankedParticipants);
+
+				const unrankedCount =
+					rankedParticipants?.filter(
+						(p) => p.ranking === null || p.ranking === undefined
+					).length || 0;
+
+				if (unrankedCount > 0) {
+					console.error(`❌ ${unrankedCount} participants still unranked`);
+					// Retry once more
+					await matchService.calculateRankings(sessionId);
+					await new Promise((resolve) => setTimeout(resolve, 200));
+				}
+
+				// Step 7: Record match history
+				console.log("📝 Recording match history...");
+				await matchService.recordMatchHistory(sessionId);
+				console.log("✅ Match history recorded");
+
+				// Step 8: Update session status to completed
+				const { error: completeError } = await supabase
+					.from("sessions")
+					.update({
+						status: "completed",
+						ended_at: new Date().toISOString(),
+					})
+					.eq("id", sessionId);
+
+				if (completeError) {
+					console.error(
+						"❌ Error setting session to completed:",
+						completeError
+					);
+					throw completeError;
+				}
+
+				console.log("✅ Session status set to completed");
+
+				// Step 9: Create notifications
+				console.log("📧 Creating notifications...");
+				await this.createSummaryNotifications(sessionId);
+				console.log("✅ Notifications created");
+
+				console.log("🎉 Match finalized successfully:", sessionId);
+				return true;
+			} catch (innerError) {
+				// Reset status on error
+				console.error(
+					"❌ Error during finalization, resetting status:",
+					innerError
+				);
+				await supabase
+					.from("sessions")
+					.update({ status: "in_progress" })
+					.eq("id", sessionId)
+					.eq("status", "completing");
+				throw innerError;
 			}
-
-			console.log("✅ Session status updated to completed successfully");
-
-			// Verify the update succeeded
-			const updatedSession = await sessionService.getSessionById(sessionId);
-			console.log(
-				"📊 Verification - Updated session status:",
-				updatedSession?.status
-			);
-
-			if (!updatedSession || updatedSession.status !== "completed") {
-				console.error("❌ Session status verification failed");
-				console.log("Expected: completed, Got:", updatedSession?.status);
-				this.processingSessionsSet.delete(sessionId);
-				return false;
-			}
-
-			console.log("✅ Session status verified as completed");
-
-			// Record match history and update ratings
-			console.log("📝 Recording match history...");
-			await matchService.recordMatchHistory(sessionId);
-			console.log("✅ Match history recorded");
-
-			// Create summary notifications for all participants
-			console.log("📧 Creating notifications...");
-			await this.createSummaryNotifications(sessionId);
-			console.log("✅ Notifications created");
-
-			console.log("🎉 Match finalized successfully:", sessionId);
-
-			// Remove from processing set
-			this.processingSessionsSet.delete(sessionId);
-			console.log("🔓 Released processing lock for session:", sessionId);
-
-			return true;
 		} catch (error) {
-			console.error("💥 Error finalizing match:", error);
-			this.processingSessionsSet.delete(sessionId);
+			console.error("💥 Error in checkAndFinalizeMatch:", error);
 			return false;
+		} finally {
+			this.releaseLock(sessionId);
 		}
 	},
 
-	// Create notifications for match summary
+	/**
+	 * Create notifications for match summary
+	 */
 	async createSummaryNotifications(sessionId: string): Promise<void> {
 		try {
-			console.log("📧 Starting notification creation for session:", sessionId);
+			console.log("📧 Creating notifications for session:", sessionId);
 
-			const participants = await sessionService.getSessionParticipants(
-				sessionId
-			);
-			console.log("👥 Found participants:", participants.length);
+			// Get participants directly
+			const { data: participants, error } = await supabase
+				.from("session_participants")
+				.select("user_id")
+				.eq("session_id", sessionId)
+				.eq("status", "joined");
 
-			const session = await sessionService.getSessionById(sessionId);
-
-			if (!session) {
-				console.error("❌ Session not found for notifications");
+			if (error) {
+				console.error(
+					"❌ Error fetching participants for notifications:",
+					error
+				);
 				return;
 			}
 
-			// Filter for joined participants only
-			const joinedParticipants = participants.filter(
-				(p) => p.status === "joined"
-			);
-			console.log("✅ Joined participants:", joinedParticipants.length);
-
-			// Insert notifications for all joined participants
-			const notifications = joinedParticipants.map((p) => ({
-				user_id: p.user_id,
-				session_id: sessionId,
-				type: "match_completed",
-				created_at: new Date().toISOString(),
-				read: false,
-			}));
-
-			if (notifications.length === 0) {
+			if (!participants || participants.length === 0) {
 				console.log("⚠️ No participants to notify");
 				return;
 			}
 
-			console.log("📤 Inserting notifications:", notifications);
-
-			const { data, error } = await supabase
+			// Check for existing notifications
+			const { data: existingNotifs } = await supabase
 				.from("match_summary_notifications")
-				.insert(notifications)
-				.select();
+				.select("user_id")
+				.eq("session_id", sessionId);
 
-			if (error) {
-				console.error("❌ Error creating summary notifications:", error);
+			const existingUserIds = new Set(
+				existingNotifs?.map((n) => n.user_id) || []
+			);
+
+			// Create notifications for users who don't have one
+			const newNotifications = participants
+				.filter((p) => !existingUserIds.has(p.user_id))
+				.map((p) => ({
+					user_id: p.user_id,
+					session_id: sessionId,
+					type: "match_completed",
+					created_at: new Date().toISOString(),
+					read: false,
+				}));
+
+			if (newNotifications.length === 0) {
+				console.log("ℹ️ All notifications already exist");
+				return;
+			}
+
+			const { error: insertError } = await supabase
+				.from("match_summary_notifications")
+				.insert(newNotifications);
+
+			if (insertError) {
+				console.error("❌ Error creating notifications:", insertError);
 			} else {
-				console.log("✅ Notifications inserted successfully:", data);
-				console.log(
-					`✅ Created ${notifications.length} summary notifications for session:`,
-					sessionId
-				);
+				console.log(`✅ Created ${newNotifications.length} notifications`);
 			}
 		} catch (error) {
 			console.error("💥 Error in createSummaryNotifications:", error);
 		}
 	},
 
-	// Setup global listener for ALL active sessions (runs in background)
-	setupGlobalListener() {
+	/**
+	 * Setup global listener for all active sessions
+	 */
+	setupGlobalListener(): void {
 		if (this.globalCompletionListener) {
-			console.log("Global completion listener already running");
+			console.log("ℹ️ Global completion listener already running");
 			return;
 		}
 
@@ -254,9 +282,13 @@ export const matchCompletionService = {
 					// Only process if submission_time was just set
 					if (participant.submission_time && !oldParticipant.submission_time) {
 						console.log(
-							"📊 Participant submitted, checking session:",
+							"📊 Detected new submission for session:",
 							participant.session_id
 						);
+
+						// Add delay to let other updates settle
+						await new Promise((resolve) => setTimeout(resolve, 500));
+
 						await this.checkAndFinalizeMatch(participant.session_id);
 					}
 				}
@@ -266,20 +298,26 @@ export const matchCompletionService = {
 			});
 	},
 
-	// Cleanup global listener
-	cleanupGlobalListener() {
+	/**
+	 * Cleanup global listener
+	 */
+	cleanupGlobalListener(): void {
 		if (this.globalCompletionListener) {
 			supabase.removeChannel(this.globalCompletionListener);
 			this.globalCompletionListener = null;
-			this.processingSessionsSet.clear();
+			this.processingSessionsMap.clear();
 			console.log("🔌 Global completion listener stopped");
 		}
 	},
 
-	// Subscribe to session changes and auto-finalize when ready (per-session)
+	/**
+	 * Setup per-session auto-finalization listener
+	 */
 	setupAutoFinalization(sessionId: string): () => void {
+		const channelName = `match-completion:${sessionId}:${Date.now()}`;
+
 		const channel = supabase
-			.channel(`match-completion:${sessionId}`)
+			.channel(channelName)
 			.on(
 				"postgres_changes",
 				{
@@ -292,9 +330,11 @@ export const matchCompletionService = {
 					const participant = payload.new as any;
 					const oldParticipant = payload.old as any;
 
-					// Only process if submission_time was just set
 					if (participant.submission_time && !oldParticipant.submission_time) {
-						console.log("📊 Participant updated, checking if match complete");
+						console.log("📊 Participant submitted, checking if match complete");
+
+						await new Promise((resolve) => setTimeout(resolve, 300));
+
 						await this.checkAndFinalizeMatch(sessionId);
 					}
 				}
@@ -307,9 +347,37 @@ export const matchCompletionService = {
 			supabase.removeChannel(channel);
 		};
 	},
+
+	/**
+	 * Manual finalization trigger (for debugging)
+	 */
+	async forceFinalize(sessionId: string): Promise<boolean> {
+		console.log("⚠️ Force finalizing match:", sessionId);
+
+		try {
+			await matchService.calculateRankings(sessionId);
+			await matchService.recordMatchHistory(sessionId);
+
+			await supabase
+				.from("sessions")
+				.update({
+					status: "completed",
+					ended_at: new Date().toISOString(),
+				})
+				.eq("id", sessionId);
+
+			await this.createSummaryNotifications(sessionId);
+
+			console.log("✅ Force finalization complete");
+			return true;
+		} catch (error) {
+			console.error("❌ Force finalization failed:", error);
+			return false;
+		}
+	},
 };
 
-// Initialize global listener when module loads
+// Initialize global listener (client-side only)
 if (typeof window !== "undefined") {
 	matchCompletionService.setupGlobalListener();
 }
