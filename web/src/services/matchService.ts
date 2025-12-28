@@ -2,17 +2,15 @@ import { supabase } from "../lib/supabase";
 import { sessionService } from "./sessionService";
 import { userService } from "./userService";
 import { codeAnalyzerService } from "./codeAnalyzerService";
+import type { SessionType } from "../types/database";
 
 export const matchService = {
 	/**
 	 * Calculate rankings after session ends
-	 * Uses atomic updates to prevent race conditions
 	 */
 	async calculateRankings(sessionId: string): Promise<void> {
 		console.log("📊 Starting ranking calculation for session:", sessionId);
 
-		// Get fresh participant data directly from the database
-		// to avoid any caching issues
 		const { data: participants, error: fetchError } = await supabase
 			.from("session_participants")
 			.select("*")
@@ -25,7 +23,7 @@ export const matchService = {
 		}
 
 		if (!participants || participants.length === 0) {
-			console.warn("⚠️ No joined participants to rank for session:", sessionId);
+			console.warn("⚠️ No joined participants to rank");
 			return;
 		}
 
@@ -39,10 +37,8 @@ export const matchService = {
 			}))
 		);
 
-		// Sort by: is_correct (true first), then by submission_time (earlier is better)
+		// Sort by: is_correct (true first), then by submission_time
 		const ranked = [...participants].sort((a, b) => {
-			// First priority: correctness (true before false)
-			// Handle null/undefined is_correct as false
 			const aCorrect = a.is_correct === true;
 			const bCorrect = b.is_correct === true;
 
@@ -50,8 +46,6 @@ export const matchService = {
 				return aCorrect ? -1 : 1;
 			}
 
-			// Second priority: submission time (earlier is better)
-			// Handle null submission times - no submission goes last
 			if (!a.submission_time && !b.submission_time) return 0;
 			if (!a.submission_time) return 1;
 			if (!b.submission_time) return -1;
@@ -69,53 +63,32 @@ export const matchService = {
 				id: p.id,
 				user_id: p.user_id,
 				is_correct: p.is_correct,
-				submission_time: p.submission_time,
 			}))
 		);
 
-		// Update rankings one by one with proper error handling
-		// We do this sequentially to avoid race conditions
+		// Update rankings
 		for (let i = 0; i < ranked.length; i++) {
 			const participant = ranked[i];
 			const newRanking = i + 1;
 
 			console.log(
-				`📊 Setting ranking ${newRanking} for participant ${participant.id} (user: ${participant.user_id})`
+				`📊 Setting ranking ${newRanking} for ${participant.user_id}`
 			);
 
 			const { data, error } = await supabase
 				.from("session_participants")
 				.update({ ranking: newRanking })
 				.eq("id", participant.id)
-				.eq("session_id", sessionId) // Extra safety: ensure we're updating the right session
+				.eq("session_id", sessionId)
 				.select();
 
 			if (error) {
-				console.error(
-					`❌ Error updating ranking for participant ${participant.id}:`,
-					error
-				);
+				console.error(`❌ Error updating ranking:`, error);
 				throw error;
 			}
 
 			if (!data || data.length === 0) {
-				console.error(
-					`❌ No rows updated for participant ${participant.id} - participant may not exist`
-				);
-
-				// Try to verify the participant exists
-				const { data: verifyData } = await supabase
-					.from("session_participants")
-					.select("id, session_id, user_id")
-					.eq("id", participant.id)
-					.single();
-
-				console.log("🔍 Verification query result:", verifyData);
-
-				// If participant doesn't exist with that ID, try updating by user_id and session_id
-				console.log(
-					"🔄 Attempting fallback update by user_id and session_id..."
-				);
+				console.log("⚠️ Primary update failed, trying fallback...");
 				const { data: fallbackData, error: fallbackError } = await supabase
 					.from("session_participants")
 					.update({ ranking: newRanking })
@@ -124,132 +97,78 @@ export const matchService = {
 					.eq("status", "joined")
 					.select();
 
-				if (fallbackError) {
-					console.error("❌ Fallback update also failed:", fallbackError);
+				if (fallbackError || !fallbackData?.length) {
 					throw new Error(
-						`Failed to update ranking for user ${participant.user_id} in session ${sessionId}`
+						`Failed to update ranking for ${participant.user_id}`
 					);
 				}
-
-				if (!fallbackData || fallbackData.length === 0) {
-					console.error("❌ Fallback update affected 0 rows");
-					throw new Error(
-						`Failed to update ranking for user ${participant.user_id} - no matching record`
-					);
-				}
-
-				console.log(
-					`✅ Fallback update succeeded for user ${participant.user_id}`
-				);
-			} else {
-				console.log(
-					`✅ Ranking ${newRanking} set for participant ${participant.id} (user: ${participant.user_id})`
-				);
 			}
+
+			console.log(`✅ Ranking ${newRanking} set for ${participant.user_id}`);
 		}
 
-		// Verify rankings were set correctly
-		const { data: verifiedParticipants, error: verifyError } = await supabase
-			.from("session_participants")
-			.select("id, user_id, ranking, is_correct")
-			.eq("session_id", sessionId)
-			.eq("status", "joined");
-
-		if (verifyError) {
-			console.error("❌ Error verifying rankings:", verifyError);
-		} else {
-			console.log("📊 Ranking verification:", verifiedParticipants);
-
-			// Check if any rankings are still null
-			const nullRankings =
-				verifiedParticipants?.filter((p) => p.ranking === null) || [];
-			if (nullRankings.length > 0) {
-				console.error(
-					"❌ Some rankings are still null after update:",
-					nullRankings
-				);
-				throw new Error(
-					`Failed to set rankings for ${nullRankings.length} participants`
-				);
-			}
-		}
-
-		console.log("✅ All rankings calculated and verified successfully");
+		console.log("✅ All rankings calculated successfully");
 	},
 
 	/**
-	 * Record match history and update ratings
-	 * Must be called AFTER rankings are verified
+	 * Record session history and update ratings
 	 */
-	async recordMatchHistory(sessionId: string): Promise<void> {
-		console.log("📝 Recording match history for session:", sessionId);
+	async recordSessionHistory(sessionId: string): Promise<void> {
+		console.log("📝 Recording session history for:", sessionId);
 
 		const session = await sessionService.getSessionById(sessionId);
 		if (!session) {
-			console.error("❌ Session not found for match history");
+			console.error("❌ Session not found");
 			return;
 		}
 
-		// Get participants with verified rankings directly from DB
+		const sessionType: SessionType = session.type || "match";
+
 		const { data: participants, error: fetchError } = await supabase
 			.from("session_participants")
 			.select("*")
 			.eq("session_id", sessionId)
 			.eq("status", "joined");
 
-		if (fetchError) {
-			console.error("❌ Error fetching participants for history:", fetchError);
-			throw fetchError;
-		}
+		if (fetchError) throw fetchError;
+		if (!participants?.length) return;
 
-		if (!participants || participants.length === 0) {
-			console.error("❌ No participants found for match history");
-			return;
-		}
-
-		console.log(
-			"📝 Recording history for participants:",
-			participants.map((p) => ({
-				user_id: p.user_id,
-				ranking: p.ranking,
-				is_correct: p.is_correct,
-			}))
-		);
-
-		// Verify all rankings are set before proceeding
-		const unrankedParticipants = participants.filter(
-			(p) => p.ranking === null || p.ranking === undefined
-		);
-
-		if (unrankedParticipants.length > 0) {
-			console.error(
-				"❌ Cannot record match history - some participants have no ranking:",
-				unrankedParticipants.map((p) => p.user_id)
-			);
-			// Re-calculate rankings before proceeding
+		// Verify rankings
+		const unranked = participants.filter((p) => p.ranking == null);
+		if (unranked.length > 0) {
 			console.log("🔄 Re-calculating rankings...");
 			await this.calculateRankings(sessionId);
 
-			// Reload participants after recalculation
-			const { data: refreshedParticipants } = await supabase
+			const { data: refreshed } = await supabase
 				.from("session_participants")
 				.select("*")
 				.eq("session_id", sessionId)
 				.eq("status", "joined");
 
-			if (refreshedParticipants) {
+			if (refreshed) {
 				participants.length = 0;
-				participants.push(...refreshedParticipants);
+				participants.push(...refreshed);
 			}
 		}
 
-		// Find the winner (rank 1)
 		const winner = participants.find((p) => p.ranking === 1);
-		console.log("🏆 Winner:", winner?.user_id, "ranking:", winner?.ranking);
+		console.log("🏆 Winner:", winner?.user_id);
+
+		// Determine which table to use
+		const historyTable = "session_history";
+		let useSessionHistory = true;
+
+		// Check if session_history table exists
+		const { error: tableCheckError } = await supabase
+			.from("session_history")
+			.select("id")
+			.limit(1);
+
+		if (tableCheckError && tableCheckError.code === "42P01") {
+			useSessionHistory = false;
+		}
 
 		for (const participant of participants) {
-			// Determine result based on ranking
-			// Rank 1 = win, others = loss
 			const isWinner = participant.ranking === 1;
 			const result = isWinner ? "win" : "loss";
 			const ratingChange = this.calculateEloRatingChange(
@@ -261,81 +180,99 @@ export const matchService = {
 				result,
 				ranking: participant.ranking,
 				ratingChange,
-				is_correct: participant.is_correct,
+				type: sessionType,
 			});
 
-			// Check if history already exists to avoid duplicates
-			const { data: existingHistory } = await supabase
-				.from("match_history")
+			// Check for existing history
+			const tableName = useSessionHistory ? "session_history" : "match_history";
+			const { data: existing } = await supabase
+				.from(tableName)
 				.select("id")
 				.eq("session_id", sessionId)
 				.eq("user_id", participant.user_id)
 				.single();
 
-			if (existingHistory) {
-				console.log(
-					`ℹ️ Match history already exists for ${participant.user_id}, skipping`
-				);
+			if (existing) {
+				console.log(`ℹ️ History already exists for ${participant.user_id}`);
 				continue;
 			}
 
-			// Insert match history
+			// Insert history
+			const historyData: any = {
+				user_id: participant.user_id,
+				session_id: sessionId,
+				problem_id: session.problem_id,
+				result,
+				ranking: participant.ranking,
+				rating_change: ratingChange,
+				completed: participant.is_correct || false,
+			};
+
+			if (useSessionHistory) {
+				historyData.type = sessionType;
+			}
+
 			const { error: historyError } = await supabase
-				.from("match_history")
-				.insert({
-					user_id: participant.user_id,
-					session_id: sessionId,
-					problem_id: session.problem_id,
-					result,
-					ranking: participant.ranking,
-					rating_change: ratingChange,
-					completed: participant.is_correct || false,
-				});
+				.from(tableName)
+				.insert(historyData);
 
 			if (historyError) {
-				console.error(
-					`❌ Error inserting match history for ${participant.user_id}:`,
-					historyError
-				);
+				console.error(`❌ Error inserting history:`, historyError);
 				continue;
 			}
 
-			// Update user rating and problems solved
+			// Update user rating and solved count
 			const profile = await userService.getProfileById(participant.user_id);
 			if (profile) {
-				const newRating = Math.max(0, profile.rating + ratingChange);
-				const newProblemsSolved = participant.is_correct
-					? profile.problems_solved + 1
-					: profile.problems_solved;
+				const updates: any = {};
+
+				if (sessionType === "match") {
+					updates.match_rating = Math.max(
+						0,
+						(profile.match_rating || profile.rating || 1500) + ratingChange
+					);
+					updates.rating = updates.match_rating; // Backward compatibility
+
+					if (participant.is_correct) {
+						updates.match_solved =
+							(profile.match_solved || profile.problems_solved || 0) + 1;
+						updates.problems_solved = updates.match_solved; // Backward compatibility
+					}
+				} else {
+					updates.collaboration_rating = Math.max(
+						0,
+						(profile.collaboration_rating || 1500) + ratingChange
+					);
+
+					if (participant.is_correct) {
+						updates.collaboration_solved =
+							(profile.collaboration_solved || 0) + 1;
+					}
+				}
 
 				const { error: profileError } = await supabase
 					.from("profiles")
-					.update({
-						rating: newRating,
-						problems_solved: newProblemsSolved,
-					})
+					.update(updates)
 					.eq("id", participant.user_id);
 
 				if (profileError) {
-					console.error(
-						`❌ Error updating profile for ${participant.user_id}:`,
-						profileError
-					);
+					console.error(`❌ Error updating profile:`, profileError);
 				} else {
-					console.log(`✅ Profile updated for ${participant.user_id}:`, {
-						oldRating: profile.rating,
-						newRating,
-						ratingChange,
-					});
+					console.log(`✅ Profile updated for ${participant.user_id}`);
 				}
 			}
 		}
 
-		console.log("✅ Match history recording complete");
+		console.log("✅ Session history recording complete");
+	},
+
+	// Alias for backward compatibility
+	async recordMatchHistory(sessionId: string): Promise<void> {
+		return this.recordSessionHistory(sessionId);
 	},
 
 	/**
-	 * Calculate ELO-style rating change based on ranking and participant count
+	 * Calculate ELO-style rating change
 	 */
 	calculateEloRatingChange(ranking: number, totalParticipants: number): number {
 		const basePoints = 10;
@@ -350,53 +287,39 @@ export const matchService = {
 	},
 
 	/**
-	 * Get match summary data with dynamic complexity analysis
+	 * Get match/session summary data
 	 */
 	async getMatchSummary(sessionId: string): Promise<any> {
-		console.log("📊 Getting match summary for session:", sessionId);
+		console.log("📊 Getting session summary for:", sessionId);
 
 		const session = await sessionService.getSessionById(sessionId);
 		if (!session) throw new Error("Session not found");
 
-		// Get participants directly from DB
+		const sessionType: SessionType = session.type || "match";
+
 		const { data: participants, error } = await supabase
 			.from("session_participants")
-			.select(
-				`
-				*,
-				user:profiles(*)
-			`
-			)
+			.select(`*, user:profiles(*)`)
 			.eq("session_id", sessionId)
 			.eq("status", "joined");
 
-		if (error) {
-			console.error("❌ Error fetching participants for summary:", error);
-			throw error;
-		}
+		if (error) throw error;
+		if (!participants?.length) throw new Error("No participants found");
 
-		if (!participants || participants.length === 0) {
-			throw new Error("No participants found for this session");
-		}
-
-		// Get participants with all data
 		const participantsWithData = await Promise.all(
 			participants.map(async (p) => {
 				const profile = p.user || (await userService.getProfileById(p.user_id));
 
-				// Analyze code complexity
 				const complexityAnalysis = codeAnalyzerService.analyzeComplexity(
 					p.code_snapshot,
 					session.language
 				);
 
-				// Calculate test case pass rate
 				const testResults = p.test_results || {};
 				const passedCount = testResults.passedCount || 0;
 				const totalCount = testResults.totalCount || 0;
 				const passRate = totalCount > 0 ? (passedCount / totalCount) * 100 : 0;
 
-				// Parse submission time
 				const submissionTime = p.submission_time
 					? new Date(p.submission_time).toLocaleTimeString("en-US", {
 							hour: "2-digit",
@@ -404,7 +327,6 @@ export const matchService = {
 					  })
 					: "N/A";
 
-				// Calculate time taken (in seconds)
 				const timeInSeconds =
 					session.started_at && p.submission_time
 						? Math.floor(
@@ -414,27 +336,40 @@ export const matchService = {
 						  )
 						: 0;
 
-				// Format time as MM:SS
 				const minutes = Math.floor(timeInSeconds / 60);
 				const seconds = timeInSeconds % 60;
 				const formattedTime = `${minutes}:${seconds
 					.toString()
 					.padStart(2, "0")}`;
 
-				// Get rating info from match_history
-				const currentRating = profile?.rating || 1500;
+				// Get current rating based on session type
+				const currentRating =
+					sessionType === "match"
+						? profile?.match_rating ?? profile?.rating ?? 1500
+						: profile?.collaboration_rating ?? 1500;
 
+				// Try to get rating change from session_history first, then match_history
+				let actualRatingChange = 0;
 				const { data: historyEntry } = await supabase
-					.from("match_history")
+					.from("session_history")
 					.select("rating_change")
 					.eq("session_id", sessionId)
 					.eq("user_id", p.user_id)
 					.single();
 
-				const actualRatingChange = historyEntry?.rating_change || 0;
-				const previousRating = currentRating - actualRatingChange;
+				if (historyEntry) {
+					actualRatingChange = historyEntry.rating_change || 0;
+				} else {
+					const { data: matchHistoryEntry } = await supabase
+						.from("match_history")
+						.select("rating_change")
+						.eq("session_id", sessionId)
+						.eq("user_id", p.user_id)
+						.single();
+					actualRatingChange = matchHistoryEntry?.rating_change || 0;
+				}
 
-				// Use actual ranking from database
+				const previousRating = currentRating - actualRatingChange;
 				const actualRanking = p.ranking ?? 999;
 
 				return {
@@ -442,7 +377,7 @@ export const matchService = {
 					avatar: profile?.avatar_url || null,
 					rank: actualRanking,
 					timeToSolve: timeInSeconds,
-					formattedTime: formattedTime,
+					formattedTime,
 					timeComplexity: complexityAnalysis.timeComplexity,
 					spaceComplexity: complexityAnalysis.spaceComplexity,
 					complexityConfidence: complexityAnalysis.confidence,
@@ -465,29 +400,16 @@ export const matchService = {
 					textColor: "text-gray-900",
 					isCorrect: p.is_correct === true,
 					userId: p.user_id,
-					currentRating: currentRating,
-					previousRating: previousRating,
+					currentRating,
+					previousRating,
 					ratingChange: actualRatingChange,
+					role: p.role,
 				};
 			})
 		);
 
-		// Sort by rank
 		const sortedPlayers = participantsWithData.sort((a, b) => a.rank - b.rank);
-
-		// Winner is the player with rank 1
 		const winner = sortedPlayers.find((p) => p.rank === 1);
-
-		console.log("🏆 Match Summary:", {
-			players: sortedPlayers.map((p) => ({
-				name: p.name,
-				rank: p.rank,
-				isCorrect: p.isCorrect,
-				timeComplexity: p.timeComplexity,
-				spaceComplexity: p.spaceComplexity,
-			})),
-			winner: winner?.name,
-		});
 
 		return {
 			problemName: session.problem?.title || "Problem",
@@ -498,6 +420,7 @@ export const matchService = {
 			problemDescription: session.problem?.description || "",
 			players: sortedPlayers,
 			session,
+			sessionType,
 		};
 	},
 
@@ -507,19 +430,17 @@ export const matchService = {
 	async checkAllSubmitted(sessionId: string): Promise<boolean> {
 		const { data: participants, error } = await supabase
 			.from("session_participants")
-			.select("id, user_id, submission_time, status")
+			.select("id, user_id, submission_time, status, role")
 			.eq("session_id", sessionId)
-			.eq("status", "joined");
+			.eq("status", "joined")
+			.neq("role", "viewer"); // Viewers don't need to submit
 
 		if (error) {
 			console.error("❌ Error checking submissions:", error);
 			return false;
 		}
 
-		if (!participants || participants.length === 0) {
-			console.log("⚠️ No joined participants found");
-			return false;
-		}
+		if (!participants?.length) return false;
 
 		const allSubmitted = participants.every((p) => p.submission_time !== null);
 
@@ -527,10 +448,6 @@ export const matchService = {
 			total: participants.length,
 			submitted: participants.filter((p) => p.submission_time !== null).length,
 			allSubmitted,
-			participants: participants.map((p) => ({
-				user_id: p.user_id,
-				has_submitted: p.submission_time !== null,
-			})),
 		});
 
 		return allSubmitted;

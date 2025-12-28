@@ -1,13 +1,21 @@
 import { supabase } from "../lib/supabase";
-import type { Session, SessionParticipant } from "../types/database";
+import type {
+	Session,
+	SessionParticipant,
+	SessionType,
+} from "../types/database";
 
 export const sessionService = {
-	// Create a new session
+	// Create a new session (supports both match and collaboration)
 	async createSession(sessionData: {
+		type?: SessionType;
 		problem_id: string;
 		language: string;
 		time_limit: number;
 		max_players: number;
+		description?: string;
+		is_public?: boolean;
+		allow_join_in_progress?: boolean;
 	}): Promise<Session> {
 		const {
 			data: { user },
@@ -17,32 +25,34 @@ export const sessionService = {
 		const { data: session, error: sessionError } = await supabase
 			.from("sessions")
 			.insert({
-				...sessionData,
+				type: sessionData.type || "match",
+				problem_id: sessionData.problem_id,
+				language: sessionData.language,
+				time_limit: sessionData.time_limit,
+				max_players: sessionData.max_players,
 				host_id: user.id,
+				description: sessionData.description || null,
+				is_public: sessionData.is_public || false,
+				allow_join_in_progress: sessionData.allow_join_in_progress || false,
 			})
-			.select(
-				`
-        *,
-        problem:problems(*),
-        host:profiles(*)
-      `
-			)
+			.select(`*, problem:problems(*), host:profiles(*)`)
 			.single();
 
 		if (sessionError) throw sessionError;
 		if (!session) throw new Error("Failed to create session");
 
-		// Step 2: Add host as a participant
+		// Add host as a participant with 'host' role
 		const { error: participantError } = await supabase
 			.from("session_participants")
 			.insert({
 				session_id: session.id,
 				user_id: user.id,
 				status: "joined",
+				role: "host",
 			});
 
 		if (participantError) {
-			// If participant insert fails, delete the session to keep database clean
+			// Cleanup on failure
 			await supabase.from("sessions").delete().eq("id", session.id);
 			throw participantError;
 		}
@@ -50,16 +60,41 @@ export const sessionService = {
 		return session;
 	},
 
+	// Create a match session (convenience method)
+	async createMatchSession(sessionData: {
+		problem_id: string;
+		language: string;
+		time_limit: number;
+		max_players: number;
+	}): Promise<Session> {
+		return this.createSession({
+			...sessionData,
+			type: "match",
+		});
+	},
+
+	// Create a collaboration session (convenience method)
+	async createCollaborationSession(sessionData: {
+		problem_id: string;
+		language: string;
+		time_limit: number;
+		max_players: number;
+		description?: string;
+		is_public?: boolean;
+		allow_join_in_progress?: boolean;
+	}): Promise<Session> {
+		return this.createSession({
+			...sessionData,
+			type: "collaboration",
+			allow_join_in_progress: sessionData.allow_join_in_progress ?? true,
+		});
+	},
+
+	// Get session by ID
 	async getSessionById(id: string): Promise<Session | null> {
 		const { data, error } = await supabase
 			.from("sessions")
-			.select(
-				`
-        *,
-        problem:problems(*),
-        host:profiles(*)
-      `
-			)
+			.select(`*, problem:problems(*), host:profiles(*)`)
 			.eq("id", id)
 			.single();
 
@@ -67,8 +102,44 @@ export const sessionService = {
 		return data;
 	},
 
-	// Add participant to session (used internally, not for invites)
-	async addParticipant(sessionId: string, userId: string): Promise<void> {
+	// Get sessions by type
+	async getSessionsByType(type: SessionType): Promise<Session[]> {
+		const { data, error } = await supabase
+			.from("sessions")
+			.select(`*, problem:problems(*), host:profiles(*)`)
+			.eq("type", type)
+			.order("created_at", { ascending: false });
+
+		if (error) throw error;
+		return data || [];
+	},
+
+	// Get public sessions available to join
+	async getPublicSessions(type?: SessionType): Promise<Session[]> {
+		let query = supabase
+			.from("sessions")
+			.select(`*, problem:problems(*), host:profiles(*)`)
+			.eq("is_public", true)
+			.in("status", ["waiting", "in_progress"]);
+
+		if (type) {
+			query = query.eq("type", type);
+		}
+
+		const { data, error } = await query.order("created_at", {
+			ascending: false,
+		});
+
+		if (error) throw error;
+		return data || [];
+	},
+
+	// Add participant to session
+	async addParticipant(
+		sessionId: string,
+		userId: string,
+		role: "participant" | "viewer" = "participant"
+	): Promise<void> {
 		// Check if participant already exists
 		const { data: existing } = await supabase
 			.from("session_participants")
@@ -77,12 +148,12 @@ export const sessionService = {
 			.eq("user_id", userId)
 			.single();
 
-		// Only insert if participant doesn't exist
 		if (!existing) {
 			const { error } = await supabase.from("session_participants").insert({
 				session_id: sessionId,
 				user_id: userId,
 				status: "joined",
+				role,
 			});
 
 			if (error) throw error;
@@ -91,20 +162,17 @@ export const sessionService = {
 
 	// Invite players to session
 	async invitePlayers(sessionId: string, userIds: string[]): Promise<void> {
-		// Get current user
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
 		if (!user) throw new Error("Not authenticated");
 
-		// Filter out the current user (host) from invitations
+		// Filter out the current user
 		const filteredUserIds = userIds.filter((id) => id !== user.id);
 
-		if (filteredUserIds.length === 0) {
-			return; // Nothing to do
-		}
+		if (filteredUserIds.length === 0) return;
 
-		// Check for existing participants to avoid duplicates
+		// Check for existing participants
 		const { data: existingParticipants } = await supabase
 			.from("session_participants")
 			.select("user_id")
@@ -115,18 +183,16 @@ export const sessionService = {
 			existingParticipants?.map((p) => p.user_id) || []
 		);
 
-		// Only invite users who aren't already participants
 		const newParticipants = filteredUserIds
 			.filter((userId) => !existingUserIds.has(userId))
 			.map((userId) => ({
 				session_id: sessionId,
 				user_id: userId,
 				status: "invited" as const,
+				role: "participant" as const,
 			}));
 
-		if (newParticipants.length === 0) {
-			return; // All users are already participants
-		}
+		if (newParticipants.length === 0) return;
 
 		const { error } = await supabase
 			.from("session_participants")
@@ -141,12 +207,7 @@ export const sessionService = {
 	): Promise<SessionParticipant[]> {
 		const { data, error } = await supabase
 			.from("session_participants")
-			.select(
-				`
-        *,
-        user:profiles(*)
-      `
-			)
+			.select(`*, user:profiles(*)`)
 			.eq("session_id", sessionId)
 			.order("joined_at", { ascending: true });
 
@@ -157,7 +218,7 @@ export const sessionService = {
 	// Update session status
 	async updateSessionStatus(
 		sessionId: string,
-		status: "waiting" | "in_progress" | "completed" | "cancelled"
+		status: "waiting" | "in_progress" | "completing" | "completed" | "cancelled"
 	): Promise<void> {
 		const updates: any = { status };
 
@@ -175,7 +236,7 @@ export const sessionService = {
 		if (error) throw error;
 	},
 
-	// Update participant status (accept/decline invitation)
+	// Update participant status
 	async updateParticipantStatus(
 		sessionId: string,
 		userId: string,
@@ -184,6 +245,53 @@ export const sessionService = {
 		const { error } = await supabase
 			.from("session_participants")
 			.update({ status })
+			.eq("session_id", sessionId)
+			.eq("user_id", userId);
+
+		if (error) throw error;
+	},
+
+	// Update participant role
+	async updateParticipantRole(
+		sessionId: string,
+		userId: string,
+		role: "host" | "participant" | "viewer"
+	): Promise<void> {
+		const { error } = await supabase
+			.from("session_participants")
+			.update({ role })
+			.eq("session_id", sessionId)
+			.eq("user_id", userId);
+
+		if (error) throw error;
+	},
+
+	// Update participant's last active timestamp (for collaboration)
+	async updateParticipantActivity(
+		sessionId: string,
+		userId: string
+	): Promise<void> {
+		const { error } = await supabase
+			.from("session_participants")
+			.update({ last_active_at: new Date().toISOString() })
+			.eq("session_id", sessionId)
+			.eq("user_id", userId);
+
+		if (error) throw error;
+	},
+
+	// Update participant's cursor position (for collaboration)
+	async updateCursorPosition(
+		sessionId: string,
+		userId: string,
+		cursorPosition: { line: number; column: number }
+	): Promise<void> {
+		const { error } = await supabase
+			.from("session_participants")
+			.update({
+				cursor_position: cursorPosition,
+				last_active_at: new Date().toISOString(),
+			})
 			.eq("session_id", sessionId)
 			.eq("user_id", userId);
 
@@ -243,8 +351,11 @@ export const sessionService = {
 		return supabase.channel(`session:${sessionId}`).unsubscribe();
 	},
 
-	// Get all sessions for a user (host or participant)
-	async getUserSessions(userId?: string): Promise<Session[]> {
+	// Get all sessions for a user
+	async getUserSessions(
+		userId?: string,
+		type?: SessionType
+	): Promise<Session[]> {
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
@@ -253,43 +364,52 @@ export const sessionService = {
 		if (!targetUserId) return [];
 
 		// Get sessions where user is host
-		const { data: hostedSessions } = await supabase
+		let hostQuery = supabase
 			.from("sessions")
-			.select(
-				`
-        *,
-        problem:problems(*),
-        host:profiles(*)
-      `
-			)
-			.eq("host_id", targetUserId)
-			.order("created_at", { ascending: false });
+			.select(`*, problem:problems(*), host:profiles(*)`)
+			.eq("host_id", targetUserId);
+
+		if (type) {
+			hostQuery = hostQuery.eq("type", type);
+		}
+
+		const { data: hostedSessions } = await hostQuery.order("created_at", {
+			ascending: false,
+		});
 
 		// Get sessions where user is participant
 		const { data: participantSessions } = await supabase
 			.from("session_participants")
-			.select(
-				`
-        session:sessions(
-          *,
-          problem:problems(*),
-          host:profiles(*)
-        )
-      `
-			)
+			.select(`session:sessions(*, problem:problems(*), host:profiles(*))`)
 			.eq("user_id", targetUserId);
 
-		const allSessions = [
+		let allSessions = [
 			...(hostedSessions || []),
-			...(participantSessions?.map((p: any) => p.session) || []),
+			...(participantSessions?.map((p: any) => p.session).filter(Boolean) ||
+				[]),
 		];
 
-		// Remove duplicates based on session id
+		// Filter by type if specified
+		if (type) {
+			allSessions = allSessions.filter((s) => s.type === type);
+		}
+
+		// Remove duplicates
 		const uniqueSessions = allSessions.filter(
 			(session, index, self) =>
 				index === self.findIndex((s) => s.id === session.id)
 		);
 
 		return uniqueSessions;
+	},
+
+	// Get user's match sessions
+	async getUserMatchSessions(userId?: string): Promise<Session[]> {
+		return this.getUserSessions(userId, "match");
+	},
+
+	// Get user's collaboration sessions
+	async getUserCollaborationSessions(userId?: string): Promise<Session[]> {
+		return this.getUserSessions(userId, "collaboration");
 	},
 };

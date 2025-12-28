@@ -1,15 +1,26 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Menu, X, Flame, Trophy, Target } from "lucide-react";
+import {
+	ChevronDown,
+	Menu,
+	X,
+	Flame,
+	Trophy,
+	Target,
+	Users,
+} from "lucide-react";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { supabase } from "../../../../lib/supabase";
+import { userService } from "../../../../services/userService";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
 import NotificationCenter from "../../../../components/notifications/NotificationCenter";
 
 interface UserStats {
-	rating: number;
-	problems_solved: number;
+	matchRating: number;
+	collaborationRating: number;
+	matchSolved: number;
+	collaborationSolved: number;
 	streak: number;
 }
 
@@ -21,8 +32,10 @@ const Navbar = () => {
 	const [showLoginModal, setShowLoginModal] = useState(false);
 	const [showRegisterModal, setShowRegisterModal] = useState(false);
 	const [userStats, setUserStats] = useState<UserStats>({
-		rating: 1500,
-		problems_solved: 0,
+		matchRating: 1500,
+		collaborationRating: 1500,
+		matchSolved: 0,
+		collaborationSolved: 0,
 		streak: 0,
 	});
 
@@ -57,59 +70,11 @@ const Navbar = () => {
 		if (!user) return;
 
 		try {
-			const { data, error } = await supabase
-				.from("profiles")
-				.select("rating, problems_solved")
-				.eq("id", user.id)
-				.single();
-
-			if (error) throw error;
-
-			if (data) {
-				// Calculate streak from match_history
-				const { data: matchData } = await supabase
-					.from("match_history")
-					.select("created_at, completed")
-					.eq("user_id", user.id)
-					.eq("completed", true)
-					.order("created_at", { ascending: false })
-					.limit(30);
-
-				const streak = calculateStreak(matchData || []);
-
-				setUserStats({
-					rating: data.rating || 1500,
-					problems_solved: data.problems_solved || 0,
-					streak,
-				});
-			}
+			const stats = await userService.getUserStats(user.id);
+			setUserStats(stats);
 		} catch (error) {
 			console.error("Error fetching user stats:", error);
 		}
-	};
-
-	const calculateStreak = (matches: any[]) => {
-		if (!matches || matches.length === 0) return 0;
-
-		let streak = 0;
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-
-		for (let i = 0; i < matches.length; i++) {
-			const matchDate = new Date(matches[i].created_at);
-			matchDate.setHours(0, 0, 0, 0);
-
-			const expectedDate = new Date(today);
-			expectedDate.setDate(today.getDate() - i);
-
-			if (matchDate.getTime() === expectedDate.getTime()) {
-				streak++;
-			} else {
-				break;
-			}
-		}
-
-		return streak;
 	};
 
 	const toggleUserMenu = () => {
@@ -136,6 +101,9 @@ const Navbar = () => {
 	const avatarLetter = username[0]?.toUpperCase() || "U";
 
 	const isActive = (path: string) => location.pathname === path;
+
+	// Calculate total solved
+	const totalSolved = userStats.matchSolved + userStats.collaborationSolved;
 
 	if (loading) {
 		return (
@@ -201,7 +169,7 @@ const Navbar = () => {
 					{user ? (
 						<>
 							{/* User Stats - Desktop */}
-							<div className="hidden lg:flex items-center space-x-4 mr-2">
+							<div className="hidden lg:flex items-center space-x-3 mr-2">
 								{/* Streak */}
 								<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700">
 									<Flame size={16} className="text-orange-500" />
@@ -211,20 +179,38 @@ const Navbar = () => {
 									<span className="text-xs text-gray-400">streak</span>
 								</div>
 
-								{/* Rating */}
-								<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700">
+								{/* Match Rating */}
+								<div
+									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
+									title="Match Rating"
+								>
 									<Trophy size={16} className="text-yellow-500" />
 									<span className="text-sm font-semibold text-white">
-										{userStats.rating}
+										{userStats.matchRating}
 									</span>
 									<span className="text-xs text-gray-400">ELO</span>
 								</div>
 
+								{/* Collaboration Rating */}
+								<div
+									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
+									title="Collaboration Rating"
+								>
+									<Users size={16} className="text-purple-500" />
+									<span className="text-sm font-semibold text-white">
+										{userStats.collaborationRating}
+									</span>
+									<span className="text-xs text-gray-400">Collab</span>
+								</div>
+
 								{/* Problems Solved */}
-								<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700">
+								<div
+									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
+									title={`Match: ${userStats.matchSolved} | Collab: ${userStats.collaborationSolved}`}
+								>
 									<Target size={16} className="text-[#5bc6ca]" />
 									<span className="text-sm font-semibold text-white">
-										{userStats.problems_solved}
+										{totalSolved}
 									</span>
 									<span className="text-xs text-gray-400">solved</span>
 								</div>
@@ -249,31 +235,41 @@ const Navbar = () => {
 								</button>
 
 								{showUserMenu && (
-									<div className="absolute right-0 mt-2 w-72 bg-[#252525] border border-gray-700 rounded-md shadow-lg py-1 z-10">
+									<div className="absolute right-0 mt-2 w-80 bg-[#252525] border border-gray-700 rounded-md shadow-lg py-1 z-10">
 										{/* User Info Header */}
 										<div className="px-4 py-3 border-b border-gray-700">
 											<p className="font-medium text-gray-200">{username}</p>
 											<p className="text-sm text-gray-400">{user.email}</p>
 
 											{/* Stats - Mobile View */}
-											<div className="flex items-center gap-3 mt-3 lg:hidden">
-												<div className="flex items-center space-x-1">
+											<div className="grid grid-cols-2 gap-2 mt-3 lg:hidden">
+												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
 													<Flame size={14} className="text-orange-500" />
 													<span className="text-xs font-semibold text-white">
 														{userStats.streak}
 													</span>
+													<span className="text-xs text-gray-500">streak</span>
 												</div>
-												<div className="flex items-center space-x-1">
+												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
 													<Trophy size={14} className="text-yellow-500" />
 													<span className="text-xs font-semibold text-white">
-														{userStats.rating}
+														{userStats.matchRating}
 													</span>
+													<span className="text-xs text-gray-500">Match</span>
 												</div>
-												<div className="flex items-center space-x-1">
+												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+													<Users size={14} className="text-purple-500" />
+													<span className="text-xs font-semibold text-white">
+														{userStats.collaborationRating}
+													</span>
+													<span className="text-xs text-gray-500">Collab</span>
+												</div>
+												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
 													<Target size={14} className="text-[#5bc6ca]" />
 													<span className="text-xs font-semibold text-white">
-														{userStats.problems_solved}
+														{totalSolved}
 													</span>
+													<span className="text-xs text-gray-500">solved</span>
 												</div>
 											</div>
 										</div>

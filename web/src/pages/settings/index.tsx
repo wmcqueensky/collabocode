@@ -8,6 +8,8 @@ import {
 	Shield,
 	Mail,
 	Check,
+	Trophy,
+	Users,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -29,6 +31,10 @@ const SettingsPage = () => {
 	const [username, setUsername] = useState("");
 	const [fullName, setFullName] = useState("");
 	const [email, setEmail] = useState("");
+	const [matchRating, setMatchRating] = useState(1500);
+	const [collaborationRating, setCollaborationRating] = useState(1500);
+	const [matchSolved, setMatchSolved] = useState(0);
+	const [collaborationSolved, setCollaborationSolved] = useState(0);
 
 	// Appearance Settings
 	const [theme, setTheme] = useState("dark");
@@ -39,6 +45,7 @@ const SettingsPage = () => {
 	const [emailNotifications, setEmailNotifications] = useState(true);
 	const [matchInvites, setMatchInvites] = useState(true);
 	const [matchResults, setMatchResults] = useState(true);
+	const [collaborationInvites, setCollaborationInvites] = useState(true);
 	const [systemUpdates, setSystemUpdates] = useState(false);
 
 	// Privacy Settings
@@ -72,6 +79,10 @@ const SettingsPage = () => {
 				setUsername(data.username || "");
 				setFullName(data.full_name || "");
 				setEmail(user.email || "");
+				setMatchRating(data.match_rating ?? data.rating ?? 1500);
+				setCollaborationRating(data.collaboration_rating ?? 1500);
+				setMatchSolved(data.match_solved ?? data.problems_solved ?? 0);
+				setCollaborationSolved(data.collaboration_solved ?? 0);
 			}
 		} catch (error) {
 			console.error("Error loading settings:", error);
@@ -106,7 +117,6 @@ const SettingsPage = () => {
 
 	const saveAppearanceSettings = () => {
 		setLoading(true);
-		// Save to localStorage or backend
 		localStorage.setItem("theme", theme);
 		localStorage.setItem("codeTheme", codeTheme);
 		localStorage.setItem("fontSize", fontSize);
@@ -120,13 +130,13 @@ const SettingsPage = () => {
 
 	const saveNotificationSettings = () => {
 		setLoading(true);
-		// Save to localStorage or backend
 		localStorage.setItem(
 			"notifications",
 			JSON.stringify({
 				emailNotifications,
 				matchInvites,
 				matchResults,
+				collaborationInvites,
 				systemUpdates,
 			})
 		);
@@ -140,7 +150,6 @@ const SettingsPage = () => {
 
 	const savePrivacySettings = () => {
 		setLoading(true);
-		// Save to localStorage or backend
 		localStorage.setItem(
 			"privacy",
 			JSON.stringify({
@@ -159,7 +168,6 @@ const SettingsPage = () => {
 
 	const saveLanguageSettings = () => {
 		setLoading(true);
-		// Save to localStorage or backend
 		localStorage.setItem("language", language);
 		localStorage.setItem("timezone", timezone);
 
@@ -295,6 +303,41 @@ const SettingsPage = () => {
 										</p>
 									</div>
 
+									{/* Rating Display */}
+									<div className="pt-4 border-t border-gray-700">
+										<h3 className="text-lg font-medium mb-3">Your Ratings</h3>
+										<div className="grid grid-cols-2 gap-4">
+											<div className="bg-[#252525] rounded-lg border border-gray-700 p-4">
+												<div className="flex items-center space-x-2 mb-2">
+													<Trophy size={18} className="text-yellow-500" />
+													<span className="text-sm text-gray-400">
+														Match Rating
+													</span>
+												</div>
+												<p className="text-2xl font-bold text-yellow-500">
+													{matchRating}
+												</p>
+												<p className="text-xs text-gray-500">
+													{matchSolved} problems solved
+												</p>
+											</div>
+											<div className="bg-[#252525] rounded-lg border border-gray-700 p-4">
+												<div className="flex items-center space-x-2 mb-2">
+													<Users size={18} className="text-purple-500" />
+													<span className="text-sm text-gray-400">
+														Collaboration Rating
+													</span>
+												</div>
+												<p className="text-2xl font-bold text-purple-500">
+													{collaborationRating}
+												</p>
+												<p className="text-xs text-gray-500">
+													{collaborationSolved} problems solved
+												</p>
+											</div>
+										</div>
+									</div>
+
 									<div className="pt-4 border-t border-gray-700">
 										<h3 className="text-lg font-medium mb-3">Password</h3>
 										<button className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center space-x-2">
@@ -382,36 +425,19 @@ const SettingsPage = () => {
 											Font Size
 										</label>
 										<div className="flex items-center space-x-3">
-											<button
-												onClick={() => setFontSize("small")}
-												className={`px-4 py-2 rounded-lg border transition-all ${
-													fontSize === "small"
-														? "border-[#5bc6ca] bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca]"
-														: "border-gray-700 bg-[#252525] text-gray-400 hover:border-gray-600"
-												}`}
-											>
-												Small
-											</button>
-											<button
-												onClick={() => setFontSize("medium")}
-												className={`px-4 py-2 rounded-lg border transition-all ${
-													fontSize === "medium"
-														? "border-[#5bc6ca] bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca]"
-														: "border-gray-700 bg-[#252525] text-gray-400 hover:border-gray-600"
-												}`}
-											>
-												Medium
-											</button>
-											<button
-												onClick={() => setFontSize("large")}
-												className={`px-4 py-2 rounded-lg border transition-all ${
-													fontSize === "large"
-														? "border-[#5bc6ca] bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca]"
-														: "border-gray-700 bg-[#252525] text-gray-400 hover:border-gray-600"
-												}`}
-											>
-												Large
-											</button>
+											{["small", "medium", "large"].map((size) => (
+												<button
+													key={size}
+													onClick={() => setFontSize(size)}
+													className={`px-4 py-2 rounded-lg border transition-all capitalize ${
+														fontSize === size
+															? "border-[#5bc6ca] bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca]"
+															: "border-gray-700 bg-[#252525] text-gray-400 hover:border-gray-600"
+													}`}
+												>
+													{size}
+												</button>
+											))}
 										</div>
 									</div>
 								</div>
@@ -431,79 +457,64 @@ const SettingsPage = () => {
 								</div>
 
 								<div className="space-y-4">
-									<div className="flex items-center justify-between py-3 border-b border-gray-700">
-										<div>
-											<p className="font-medium">Email Notifications</p>
-											<p className="text-sm text-gray-400">
-												Receive notifications via email
-											</p>
+									{[
+										{
+											key: "emailNotifications",
+											value: emailNotifications,
+											setter: setEmailNotifications,
+											title: "Email Notifications",
+											desc: "Receive notifications via email",
+										},
+										{
+											key: "matchInvites",
+											value: matchInvites,
+											setter: setMatchInvites,
+											title: "Match Invitations",
+											desc: "Get notified when someone invites you to a match",
+										},
+										{
+											key: "matchResults",
+											value: matchResults,
+											setter: setMatchResults,
+											title: "Match Results",
+											desc: "Receive notifications about match outcomes",
+										},
+										{
+											key: "collaborationInvites",
+											value: collaborationInvites,
+											setter: setCollaborationInvites,
+											title: "Collaboration Invitations",
+											desc: "Get notified when someone invites you to collaborate",
+										},
+										{
+											key: "systemUpdates",
+											value: systemUpdates,
+											setter: setSystemUpdates,
+											title: "System Updates",
+											desc: "Get notified about new features and updates",
+										},
+									].map((item, index, arr) => (
+										<div
+											key={item.key}
+											className={`flex items-center justify-between py-3 ${
+												index < arr.length - 1 ? "border-b border-gray-700" : ""
+											}`}
+										>
+											<div>
+												<p className="font-medium">{item.title}</p>
+												<p className="text-sm text-gray-400">{item.desc}</p>
+											</div>
+											<label className="relative inline-flex items-center cursor-pointer">
+												<input
+													type="checkbox"
+													checked={item.value}
+													onChange={(e) => item.setter(e.target.checked)}
+													className="sr-only peer"
+												/>
+												<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
+											</label>
 										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={emailNotifications}
-												onChange={(e) =>
-													setEmailNotifications(e.target.checked)
-												}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
-
-									<div className="flex items-center justify-between py-3 border-b border-gray-700">
-										<div>
-											<p className="font-medium">Match Invitations</p>
-											<p className="text-sm text-gray-400">
-												Get notified when someone invites you to a match
-											</p>
-										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={matchInvites}
-												onChange={(e) => setMatchInvites(e.target.checked)}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
-
-									<div className="flex items-center justify-between py-3 border-b border-gray-700">
-										<div>
-											<p className="font-medium">Match Results</p>
-											<p className="text-sm text-gray-400">
-												Receive notifications about match outcomes
-											</p>
-										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={matchResults}
-												onChange={(e) => setMatchResults(e.target.checked)}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
-
-									<div className="flex items-center justify-between py-3">
-										<div>
-											<p className="font-medium">System Updates</p>
-											<p className="text-sm text-gray-400">
-												Get notified about new features and updates
-											</p>
-										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={systemUpdates}
-												onChange={(e) => setSystemUpdates(e.target.checked)}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
+									))}
 								</div>
 							</div>
 						)}
@@ -536,41 +547,43 @@ const SettingsPage = () => {
 										</select>
 									</div>
 
-									<div className="flex items-center justify-between py-3 border-b border-gray-700">
-										<div>
-											<p className="font-medium">Show Email</p>
-											<p className="text-sm text-gray-400">
-												Display your email on your profile
-											</p>
+									{[
+										{
+											key: "showEmail",
+											value: showEmail,
+											setter: setShowEmail,
+											title: "Show Email",
+											desc: "Display your email on your profile",
+										},
+										{
+											key: "showStats",
+											value: showStats,
+											setter: setShowStats,
+											title: "Show Statistics",
+											desc: "Display your coding stats publicly",
+										},
+									].map((item, index, arr) => (
+										<div
+											key={item.key}
+											className={`flex items-center justify-between py-3 ${
+												index < arr.length - 1 ? "border-b border-gray-700" : ""
+											}`}
+										>
+											<div>
+												<p className="font-medium">{item.title}</p>
+												<p className="text-sm text-gray-400">{item.desc}</p>
+											</div>
+											<label className="relative inline-flex items-center cursor-pointer">
+												<input
+													type="checkbox"
+													checked={item.value}
+													onChange={(e) => item.setter(e.target.checked)}
+													className="sr-only peer"
+												/>
+												<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
+											</label>
 										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={showEmail}
-												onChange={(e) => setShowEmail(e.target.checked)}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
-
-									<div className="flex items-center justify-between py-3">
-										<div>
-											<p className="font-medium">Show Statistics</p>
-											<p className="text-sm text-gray-400">
-												Display your coding stats publicly
-											</p>
-										</div>
-										<label className="relative inline-flex items-center cursor-pointer">
-											<input
-												type="checkbox"
-												checked={showStats}
-												onChange={(e) => setShowStats(e.target.checked)}
-												className="sr-only peer"
-											/>
-											<div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5bc6ca] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5bc6ca]"></div>
-										</label>
-									</div>
+									))}
 
 									<div className="pt-4 border-t border-gray-700">
 										<h3 className="text-lg font-medium mb-3 text-red-400">
