@@ -22,10 +22,12 @@ import {
 
 const Router = () => (
 	<Routes>
+		{/* Home Layout */}
 		<Route path={HOME_PATH} element={<HomeLayout />}>
 			<Route index element={<HomePage />} />
 		</Route>
 
+		{/* Main Layout (with navbar) */}
 		<Route element={<MainLayout />}>
 			<Route path={EXPLORE_PATH} element={<ExplorePage />} />
 			<Route path={SETTINGS_PATH} element={<SettingsPage />} />
@@ -34,9 +36,13 @@ const Router = () => (
 				path={COLLABORATION_SUMMARY_PATH}
 				element={<CollaborationSummaryPage />}
 			/>
-			<Route path={COLLABORATION_PATH} element={<CollaborationPage />} />
+			<Route
+				path={`${COLLABORATION_SUMMARY_PATH}/:sessionId`}
+				element={<CollaborationSummaryPage />}
+			/>
 		</Route>
 
+		{/* Match Pages (full screen, no main layout) */}
 		<Route path={`${MATCH_PATH}/:sessionId`} element={<MatchPage />} />
 		<Route path={MATCH_PATH} element={<MatchPage />} />
 		<Route
@@ -44,6 +50,14 @@ const Router = () => (
 			element={<MatchSummaryPage />}
 		/>
 
+		{/* Collaboration Pages (full screen, no main layout) */}
+		<Route
+			path={`${COLLABORATION_PATH}/:sessionId`}
+			element={<CollaborationPage />}
+		/>
+		<Route path={COLLABORATION_PATH} element={<CollaborationPage />} />
+
+		{/* Catch all - redirect to home */}
 		<Route path="*" element={<Navigate to={HOME_PATH} />} />
 	</Routes>
 );

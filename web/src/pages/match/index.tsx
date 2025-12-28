@@ -211,7 +211,9 @@ export default function MatchPage() {
 				const isCurrentUser = p.user_id === currentUserId;
 
 				// Calculate progress based on test results
-				const testResults = p.test_results || {};
+				const testResults =
+					(p.test_results as { passedCount?: number; totalCount?: number }) ||
+					{};
 				const passedCount = testResults.passedCount || 0;
 				const totalCount = testResults.totalCount || testCases.length;
 

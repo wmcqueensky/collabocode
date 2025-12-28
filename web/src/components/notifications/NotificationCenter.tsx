@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, X, Check, Clock, Users, Trophy } from "lucide-react";
+import { Bell, X, Check, Clock, Users, Trophy, Rocket } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { sessionService } from "../../services/sessionService";
 import type { Session } from "../../types/database";
 
 type Notification = {
 	id: string;
-	type: "session_invite" | "match_completed";
+	type: "session_invite" | "match_completed" | "collaboration_completed";
+	sessionType: "match" | "collaboration";
 	session: Session;
 	createdAt: string;
 	read: boolean;
@@ -22,7 +23,6 @@ const NotificationCenter = () => {
 	useEffect(() => {
 		loadNotifications();
 
-		// Set up real-time subscription
 		const setupSubscription = async () => {
 			const {
 				data: { user },
@@ -35,13 +35,11 @@ const NotificationCenter = () => {
 
 			console.log("🔔 Setting up notification subscription for user:", user.id);
 
-			// Create a unique channel name
 			const channelName = `user-notifications-${user.id}-${Date.now()}`;
-			console.log("📡 Channel name:", channelName);
 
 			const channel = supabase
 				.channel(channelName)
-				// Listen for new session invites
+				// Listen for new session invites (both match and collaboration)
 				.on(
 					"postgres_changes",
 					{
@@ -54,9 +52,8 @@ const NotificationCenter = () => {
 						console.log("🔔 New invitation received:", payload);
 						await loadNotifications();
 
-						// Browser notification
 						if (Notification.permission === "granted") {
-							new Notification("New Coding Session Invite!", {
+							new Notification("New Session Invite!", {
 								body: "You have been invited to join a coding session",
 								icon: "/logo.png",
 							});
@@ -72,12 +69,11 @@ const NotificationCenter = () => {
 						table: "session_participants",
 						filter: `user_id=eq.${user.id}`,
 					},
-					async (payload) => {
-						console.log("🔔 Participant status updated:", payload);
+					async () => {
 						await loadNotifications();
 					}
 				)
-				// Listen for match completed notifications - CRITICAL
+				// Listen for match/session completed notifications
 				.on(
 					"postgres_changes",
 					{
@@ -87,21 +83,17 @@ const NotificationCenter = () => {
 						filter: `user_id=eq.${user.id}`,
 					},
 					async (payload) => {
-						console.log("🎉 Match completed notification received:", payload);
-
-						// Force reload notifications
+						console.log("🎉 Session completed notification received:", payload);
 						await loadNotifications();
 
-						// Browser notification
 						if (Notification.permission === "granted") {
-							new Notification("Match Completed!", {
-								body: "Your match has finished! View the summary now.",
+							new Notification("Session Completed!", {
+								body: "Your session has finished! View the summary now.",
 								icon: "/logo.png",
 							});
 						}
 					}
 				)
-				// Listen for DELETE events (when notifications are marked as read)
 				.on(
 					"postgres_changes",
 					{
@@ -110,40 +102,28 @@ const NotificationCenter = () => {
 						table: "match_summary_notifications",
 						filter: `user_id=eq.${user.id}`,
 					},
-					async (payload) => {
-						console.log("🔔 Notification updated:", payload);
+					async () => {
 						await loadNotifications();
 					}
 				)
 				.subscribe((status) => {
 					console.log("📡 Notification subscription status:", status);
-					if (status === "SUBSCRIBED") {
-						console.log("✅ Successfully subscribed to notifications channel");
-					} else if (status === "CHANNEL_ERROR") {
-						console.error("❌ Subscription error - retrying...");
-						setTimeout(() => setupSubscription(), 2000);
-					} else if (status === "TIMED_OUT") {
-						console.error("⏱️ Subscription timed out - retrying...");
-						setTimeout(() => setupSubscription(), 2000);
-					} else if (status === "CLOSED") {
-						console.warn("⚠️ Channel closed - retrying...");
+					if (
+						status === "CHANNEL_ERROR" ||
+						status === "TIMED_OUT" ||
+						status === "CLOSED"
+					) {
 						setTimeout(() => setupSubscription(), 2000);
 					}
 				});
 
 			return () => {
-				console.log("Cleaning up notification subscription");
 				supabase.removeChannel(channel);
 			};
 		};
 
 		const cleanup = setupSubscription();
-
-		// Also set up periodic polling as backup (every 10 seconds for testing, 30 in production)
-		const pollInterval = setInterval(() => {
-			console.log("🔄 Polling for notifications (backup)");
-			loadNotifications();
-		}, 10000); // 10 seconds for testing
+		const pollInterval = setInterval(() => loadNotifications(), 15000);
 
 		return () => {
 			cleanup.then((cleanupFn) => cleanupFn && cleanupFn());
@@ -156,12 +136,7 @@ const NotificationCenter = () => {
 			const {
 				data: { user },
 			} = await supabase.auth.getUser();
-			if (!user) {
-				console.log("No user found, skipping notification load");
-				return;
-			}
-
-			console.log("📥 Loading notifications for user:", user.id);
+			if (!user) return;
 
 			// Get pending invitations
 			const { data: invites, error: inviteError } = await supabase
@@ -182,20 +157,16 @@ const NotificationCenter = () => {
 				.eq("status", "invited")
 				.order("joined_at", { ascending: false });
 
-			if (inviteError) {
-				console.error("Error loading invites:", inviteError);
-				throw inviteError;
-			}
+			if (inviteError) throw inviteError;
 
-			console.log("📨 Invites loaded:", invites?.length || 0);
-
-			// Get match completed notifications (unread)
-			const { data: completedMatches, error: completedError } = await supabase
+			// Get match/session completed notifications (unread)
+			const { data: completedSessions, error: completedError } = await supabase
 				.from("match_summary_notifications")
 				.select(
 					`
           id,
           session_id,
+          session_type,
           created_at,
           read,
           session:sessions(
@@ -209,41 +180,34 @@ const NotificationCenter = () => {
 				.eq("read", false)
 				.order("created_at", { ascending: false });
 
-			if (completedError) {
-				console.error("Error loading completed matches:", completedError);
-				throw completedError;
-			}
-
-			console.log(
-				"🏆 Completed matches loaded:",
-				completedMatches?.length || 0,
-				completedMatches
-			);
+			if (completedError) throw completedError;
 
 			const inviteNotifs: Notification[] = (invites || []).map(
 				(invite: any) => ({
 					id: invite.id,
 					type: "session_invite" as const,
+					sessionType: invite.session?.type || "match",
 					session: invite.session,
 					createdAt: invite.joined_at,
 					read: false,
 				})
 			);
 
-			const completedNotifs: Notification[] = (completedMatches || []).map(
-				(match: any) => ({
-					id: match.id,
-					type: "match_completed" as const,
-					session: match.session,
-					createdAt: match.created_at,
-					read: match.read,
+			const completedNotifs: Notification[] = (completedSessions || []).map(
+				(session: any) => ({
+					id: session.id,
+					type:
+						session.session?.type === "collaboration"
+							? ("collaboration_completed" as const)
+							: ("match_completed" as const),
+					sessionType: session.session?.type || session.session_type || "match",
+					session: session.session,
+					createdAt: session.created_at,
+					read: session.read,
 				})
 			);
 
-			const allNotifs = [...completedNotifs, ...inviteNotifs];
-			console.log("📋 Total notifications:", allNotifs.length);
-
-			setNotifications(allNotifs);
+			setNotifications([...completedNotifs, ...inviteNotifs]);
 		} catch (error) {
 			console.error("Error loading notifications:", error);
 		} finally {
@@ -253,16 +217,26 @@ const NotificationCenter = () => {
 
 	const handleAcceptInvite = async (notification: Notification) => {
 		try {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (!user) return;
+
 			await sessionService.updateParticipantStatus(
 				notification.session.id,
-				(
-					await supabase.auth.getUser()
-				).data.user!.id,
+				user.id,
 				"joined"
 			);
 
 			setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
-			navigate(`/match/${notification.session.id}`);
+
+			// Navigate based on session type
+			const path =
+				notification.sessionType === "collaboration"
+					? `/collaboration/${notification.session.id}`
+					: `/match/${notification.session.id}`;
+
+			navigate(path);
 			setIsOpen(false);
 		} catch (error) {
 			console.error("Error accepting invite:", error);
@@ -272,11 +246,14 @@ const NotificationCenter = () => {
 
 	const handleDeclineInvite = async (notification: Notification) => {
 		try {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (!user) return;
+
 			await sessionService.updateParticipantStatus(
 				notification.session.id,
-				(
-					await supabase.auth.getUser()
-				).data.user!.id,
+				user.id,
 				"declined"
 			);
 
@@ -289,23 +266,21 @@ const NotificationCenter = () => {
 
 	const handleViewSummary = async (notification: Notification) => {
 		try {
-			console.log("📊 Viewing summary for session:", notification.session.id);
-
 			// Mark notification as read
-			const { error } = await supabase
+			await supabase
 				.from("match_summary_notifications")
 				.update({ read: true })
 				.eq("id", notification.id);
 
-			if (error) {
-				console.error("Error marking notification as read:", error);
-			}
-
-			// Remove from local state
 			setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
 
-			// Navigate to summary
-			navigate(`/match-summary/${notification.session.id}`);
+			// Navigate based on session type
+			const path =
+				notification.sessionType === "collaboration"
+					? `/collaboration-summary/${notification.session.id}`
+					: `/match-summary/${notification.session.id}`;
+
+			navigate(path);
 			setIsOpen(false);
 		} catch (error) {
 			console.error("Error viewing summary:", error);
@@ -361,40 +336,65 @@ const NotificationCenter = () => {
 										key={notification.id}
 										className="p-4 hover:bg-gray-800 transition"
 									>
-										{notification.type === "match_completed" ? (
-											// Match Completed Notification
+										{notification.type === "match_completed" ||
+										notification.type === "collaboration_completed" ? (
+											// Session Completed Notification
 											<div className="flex items-start gap-3">
-												<div className="w-10 h-10 rounded-full bg-[#FFD93D] flex items-center justify-center flex-shrink-0">
-													<Trophy size={20} className="text-gray-900" />
+												<div
+													className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+														notification.sessionType === "collaboration"
+															? "bg-purple-500"
+															: "bg-[#FFD93D]"
+													}`}
+												>
+													{notification.sessionType === "collaboration" ? (
+														<Rocket size={20} className="text-white" />
+													) : (
+														<Trophy size={20} className="text-gray-900" />
+													)}
 												</div>
 
 												<div className="flex-1 min-w-0">
 													<p className="text-white font-medium">
-														Match Completed! 🎉
+														{notification.sessionType === "collaboration"
+															? "Collaboration Completed! 🎉"
+															: "Match Completed! 🎉"}
 													</p>
 													<p className="text-sm text-gray-400 mt-1">
-														Your match for{" "}
+														Your {notification.sessionType} for{" "}
 														<span className="text-white">
 															{notification.session.problem?.title}
 														</span>{" "}
 														has finished. View the results now!
 													</p>
 
-													{/* Session Details */}
 													<div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
-														<span className="px-2 py-0.5 rounded-full bg-green-600 text-white">
+														<span
+															className={`px-2 py-0.5 rounded-full text-white ${
+																notification.sessionType === "collaboration"
+																	? "bg-purple-600"
+																	: "bg-green-600"
+															}`}
+														>
 															Completed
 														</span>
 													</div>
 
-													{/* Action Button */}
 													<div className="mt-3">
 														<button
 															onClick={() => handleViewSummary(notification)}
-															className="w-full px-3 py-1.5 bg-[#FFD93D] hover:bg-[#e5c435] text-gray-900 text-sm rounded-md flex items-center justify-center gap-1 transition font-medium"
+															className={`w-full px-3 py-1.5 text-sm rounded-md flex items-center justify-center gap-1 transition font-medium ${
+																notification.sessionType === "collaboration"
+																	? "bg-purple-500 hover:bg-purple-600 text-white"
+																	: "bg-[#FFD93D] hover:bg-[#e5c435] text-gray-900"
+															}`}
 														>
-															<Trophy size={14} />
-															View Match Summary
+															{notification.sessionType === "collaboration" ? (
+																<Rocket size={14} />
+															) : (
+																<Trophy size={14} />
+															)}
+															View Summary
 														</button>
 													</div>
 												</div>
@@ -402,25 +402,45 @@ const NotificationCenter = () => {
 										) : (
 											// Session Invite Notification
 											<div className="flex items-start gap-3">
-												<div className="w-10 h-10 rounded-full bg-[#5bc6ca] flex items-center justify-center flex-shrink-0">
-													<Users size={20} className="text-white" />
+												<div
+													className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+														notification.sessionType === "collaboration"
+															? "bg-purple-500"
+															: "bg-[#5bc6ca]"
+													}`}
+												>
+													{notification.sessionType === "collaboration" ? (
+														<Rocket size={20} className="text-white" />
+													) : (
+														<Users size={20} className="text-white" />
+													)}
 												</div>
 
 												<div className="flex-1 min-w-0">
 													<p className="text-white font-medium">
-														Coding Session Invite
+														{notification.sessionType === "collaboration"
+															? "Collaboration Invite"
+															: "Coding Session Invite"}
 													</p>
 													<p className="text-sm text-gray-400 mt-1">
-														<span className="text-[#5bc6ca]">
+														<span
+															className={
+																notification.sessionType === "collaboration"
+																	? "text-purple-400"
+																	: "text-[#5bc6ca]"
+															}
+														>
 															@{notification.session.host?.username}
 														</span>{" "}
-														invited you to solve{" "}
+														invited you to{" "}
+														{notification.sessionType === "collaboration"
+															? "collaborate on"
+															: "solve"}{" "}
 														<span className="text-white">
 															{notification.session.problem?.title}
 														</span>
 													</p>
 
-													{/* Session Details */}
 													<div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
 														<span className="flex items-center">
 															<Clock size={12} className="mr-1" />
@@ -428,18 +448,34 @@ const NotificationCenter = () => {
 														</span>
 														<span className="flex items-center">
 															<Users size={12} className="mr-1" />
-															{notification.session.max_players} players
+															{notification.session.max_players}{" "}
+															{notification.sessionType === "collaboration"
+																? "collaborators"
+																: "players"}
 														</span>
-														<span className="px-2 py-0.5 rounded-full bg-yellow-600 text-white">
+														<span
+															className={`px-2 py-0.5 rounded-full text-white ${
+																notification.session.problem?.difficulty ===
+																"Easy"
+																	? "bg-green-600"
+																	: notification.session.problem?.difficulty ===
+																	  "Medium"
+																	? "bg-yellow-600"
+																	: "bg-red-600"
+															}`}
+														>
 															{notification.session.problem?.difficulty}
 														</span>
 													</div>
 
-													{/* Action Buttons */}
 													<div className="mt-3 flex gap-2">
 														<button
 															onClick={() => handleAcceptInvite(notification)}
-															className="flex-1 px-3 py-1.5 bg-[#5bc6ca] hover:bg-[#48aeb3] text-white text-sm rounded-md flex items-center justify-center gap-1 transition"
+															className={`flex-1 px-3 py-1.5 text-white text-sm rounded-md flex items-center justify-center gap-1 transition ${
+																notification.sessionType === "collaboration"
+																	? "bg-purple-500 hover:bg-purple-600"
+																	: "bg-[#5bc6ca] hover:bg-[#48aeb3]"
+															}`}
 														>
 															<Check size={14} />
 															Accept
