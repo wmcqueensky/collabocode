@@ -7,6 +7,7 @@ import {
 	XCircle,
 	Loader2,
 } from "lucide-react";
+import { supabase } from "../../../lib/supabase";
 import type { Session, SessionParticipant } from "../../../types/database";
 
 interface WaitingLobbyProps {
@@ -18,11 +19,90 @@ interface WaitingLobbyProps {
 
 export const WaitingLobby = ({
 	session,
-	participants,
+	participants: initialParticipants,
 	currentUserId,
 	onStartSession,
 }: WaitingLobbyProps) => {
 	const [timeElapsed, setTimeElapsed] = useState(0);
+	const [participants, setParticipants] =
+		useState<SessionParticipant[]>(initialParticipants);
+	const [sessionStatus, setSessionStatus] = useState(session.status);
+
+	// Update participants when prop changes
+	useEffect(() => {
+		setParticipants(initialParticipants);
+	}, [initialParticipants]);
+
+	// Real-time subscription for participant updates
+	useEffect(() => {
+		if (!session.id) return;
+
+		// Subscribe to participant changes
+		const participantChannel = supabase
+			.channel(`waiting-lobby-participants:${session.id}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "session_participants",
+					filter: `session_id=eq.${session.id}`,
+				},
+				async (payload) => {
+					console.log("[WaitingLobby] Participant update:", payload);
+
+					// Refetch all participants to get user data
+					const { data: updatedParticipants } = await supabase
+						.from("session_participants")
+						.select(
+							`
+							*,
+							user:profiles(id, username, avatar_url, rating, problems_solved)
+						`
+						)
+						.eq("session_id", session.id);
+
+					if (updatedParticipants) {
+						setParticipants(updatedParticipants as SessionParticipant[]);
+					}
+				}
+			)
+			.subscribe((status) => {
+				console.log("[WaitingLobby] Participant subscription:", status);
+			});
+
+		// Subscribe to session status changes
+		const sessionChannel = supabase
+			.channel(`waiting-lobby-session:${session.id}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "UPDATE",
+					schema: "public",
+					table: "sessions",
+					filter: `id=eq.${session.id}`,
+				},
+				(payload) => {
+					console.log("[WaitingLobby] Session update:", payload);
+					const updatedSession = payload.new as Session;
+					setSessionStatus(updatedSession.status);
+
+					// If session started, trigger navigation
+					if (updatedSession.status === "in_progress") {
+						// Force page reload to enter the session
+						window.location.reload();
+					}
+				}
+			)
+			.subscribe((status) => {
+				console.log("[WaitingLobby] Session subscription:", status);
+			});
+
+		return () => {
+			supabase.removeChannel(participantChannel);
+			supabase.removeChannel(sessionChannel);
+		};
+	}, [session.id]);
 
 	// Timer for elapsed time
 	useEffect(() => {
@@ -81,21 +161,33 @@ export const WaitingLobby = ({
 		}
 	};
 
+	// Determine accent color based on session type
+	const isCollaboration = session.type === "collaboration";
+	const accentColor = isCollaboration ? "purple" : "[#5bc6ca]";
+	const gradientFrom = isCollaboration ? "from-purple-500" : "from-[#5bc6ca]";
+	const gradientTo = isCollaboration ? "to-purple-600" : "to-[#48aeb3]";
+
 	return (
 		<div className="min-h-screen bg-[#171717] flex items-center justify-center p-4">
 			<div className="max-w-4xl w-full">
 				{/* Main Card */}
 				<div className="bg-[#1f1f1f] rounded-xl border border-gray-700 overflow-hidden">
 					{/* Header */}
-					<div className="bg-gradient-to-r from-[#5bc6ca] to-[#48aeb3] p-6 text-center">
+					<div
+						className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} p-6 text-center`}
+					>
 						<div className="flex items-center justify-center mb-2">
 							<Users size={32} className="text-white mr-2" />
 							<h1 className="text-3xl font-bold text-white">
-								Waiting for Players
+								{isCollaboration
+									? "Waiting for Collaborators"
+									: "Waiting for Players"}
 							</h1>
 						</div>
 						<p className="text-white/90 text-sm">
-							Please wait while other players accept the invitation
+							{isCollaboration
+								? "Please wait while collaborators accept the invitation"
+								: "Please wait while other players accept the invitation"}
 						</p>
 					</div>
 
@@ -105,7 +197,9 @@ export const WaitingLobby = ({
 							<div className="bg-[#2a2a2a] rounded-lg p-4">
 								<div className="flex items-center text-gray-400 mb-1">
 									<Code size={16} className="mr-2" />
-									<span className="text-sm">Problem</span>
+									<span className="text-sm">
+										{isCollaboration ? "Project" : "Problem"}
+									</span>
 								</div>
 								<p className="text-white font-medium truncate">
 									{session.problem?.title || "Loading..."}
@@ -134,14 +228,16 @@ export const WaitingLobby = ({
 						{/* Progress Bar */}
 						<div>
 							<div className="flex justify-between items-center mb-2">
-								<span className="text-sm text-gray-400">Player Status</span>
+								<span className="text-sm text-gray-400">
+									{isCollaboration ? "Collaborator Status" : "Player Status"}
+								</span>
 								<span className="text-sm text-gray-400">
 									{joinedCount} / {session.max_players} ready
 								</span>
 							</div>
 							<div className="h-2 bg-gray-700 rounded-full overflow-hidden">
 								<div
-									className="h-full bg-gradient-to-r from-[#5bc6ca] to-[#48aeb3] transition-all duration-500"
+									className={`h-full bg-gradient-to-r ${gradientFrom} ${gradientTo} transition-all duration-500`}
 									style={{
 										width: `${(joinedCount / session.max_players) * 100}%`,
 									}}
@@ -153,7 +249,8 @@ export const WaitingLobby = ({
 					{/* Participants List */}
 					<div className="p-6">
 						<h3 className="text-lg font-semibold text-white mb-4">
-							Players ({participants.length} / {session.max_players})
+							{isCollaboration ? "Collaborators" : "Players"} (
+							{participants.length} / {session.max_players})
 						</h3>
 						<div className="space-y-3">
 							{participants.map((participant) => {
@@ -165,7 +262,9 @@ export const WaitingLobby = ({
 										key={participant.id}
 										className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
 											isCurrentUser
-												? "bg-[#5bc6ca10] border-[#5bc6ca]"
+												? isCollaboration
+													? "bg-purple-500/10 border-purple-500"
+													: "bg-[#5bc6ca10] border-[#5bc6ca]"
 												: "bg-[#2a2a2a] border-gray-700"
 										}`}
 									>
@@ -179,7 +278,13 @@ export const WaitingLobby = ({
 														className="w-12 h-12 rounded-full object-cover"
 													/>
 												) : (
-													<div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#5bc6ca] to-[#48aeb3] flex items-center justify-center text-white font-medium">
+													<div
+														className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-medium ${
+															isCollaboration
+																? "bg-gradient-to-br from-purple-500 to-purple-600"
+																: "bg-gradient-to-br from-[#5bc6ca] to-[#48aeb3]"
+														}`}
+													>
 														{user?.username?.charAt(0).toUpperCase() || "?"}
 													</div>
 												)}
@@ -195,10 +300,24 @@ export const WaitingLobby = ({
 													<p className="text-white font-medium truncate">
 														{user?.username || "Unknown"}
 														{isCurrentUser && (
-															<span className="text-[#5bc6ca] ml-2">(You)</span>
+															<span
+																className={
+																	isCollaboration
+																		? "text-purple-400 ml-2"
+																		: "text-[#5bc6ca] ml-2"
+																}
+															>
+																(You)
+															</span>
 														)}
 														{participant.user_id === session.host_id && (
-															<span className="ml-2 text-xs bg-[#5bc6ca] text-black px-2 py-0.5 rounded-full">
+															<span
+																className={`ml-2 text-xs text-black px-2 py-0.5 rounded-full ${
+																	isCollaboration
+																		? "bg-purple-500"
+																		: "bg-[#5bc6ca]"
+																}`}
+															>
 																Host
 															</span>
 														)}
@@ -233,7 +352,8 @@ export const WaitingLobby = ({
 										</div>
 										<div>
 											<p className="text-gray-500 font-medium">
-												Waiting for player...
+												Waiting for{" "}
+												{isCollaboration ? "collaborator" : "player"}...
 											</p>
 											<p className="text-sm text-gray-600">Slot available</p>
 										</div>
@@ -259,16 +379,24 @@ export const WaitingLobby = ({
 								{allPlayersJoined ? (
 									<div className="flex items-center justify-center text-green-500">
 										<CheckCircle size={20} className="mr-2" />
-										<span className="font-medium">All players ready!</span>
+										<span className="font-medium">
+											All {isCollaboration ? "collaborators" : "players"} ready!
+										</span>
 									</div>
 								) : invitedCount > 0 ? (
 									<div className="flex items-center justify-center text-yellow-500">
 										<Loader2 size={20} className="mr-2 animate-spin" />
-										<span>Waiting for {invitedCount} player(s)...</span>
+										<span>
+											Waiting for {invitedCount}{" "}
+											{invitedCount === 1 ? "person" : "people"}...
+										</span>
 									</div>
 								) : (
 									<div className="text-gray-400">
-										<span>Waiting for more players to join...</span>
+										<span>
+											Waiting for more{" "}
+											{isCollaboration ? "collaborators" : "players"} to join...
+										</span>
 									</div>
 								)}
 							</div>
@@ -281,7 +409,9 @@ export const WaitingLobby = ({
 										disabled={!canStart}
 										className={`px-6 py-2 rounded-lg font-medium transition-all ${
 											canStart
-												? "bg-[#5bc6ca] hover:bg-[#48aeb3] text-white"
+												? isCollaboration
+													? "bg-purple-500 hover:bg-purple-600 text-white"
+													: "bg-[#5bc6ca] hover:bg-[#48aeb3] text-white"
 												: "bg-gray-700 text-gray-500 cursor-not-allowed"
 										}`}
 									>
@@ -298,10 +428,21 @@ export const WaitingLobby = ({
 
 						{/* Additional Info */}
 						{isHost && !allPlayersJoined && joinedCount >= 2 && (
-							<div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-								<p className="text-yellow-500 text-sm text-center">
-									💡 You can start the session now with {joinedCount} players,
-									or wait for more players to join
+							<div
+								className={`mt-4 p-3 rounded-lg ${
+									isCollaboration
+										? "bg-purple-500/10 border border-purple-500/30"
+										: "bg-yellow-500/10 border border-yellow-500/30"
+								}`}
+							>
+								<p
+									className={`text-sm text-center ${
+										isCollaboration ? "text-purple-400" : "text-yellow-500"
+									}`}
+								>
+									💡 You can start the session now with {joinedCount}{" "}
+									{isCollaboration ? "collaborators" : "players"}, or wait for
+									more to join
 								</p>
 							</div>
 						)}
@@ -309,10 +450,25 @@ export const WaitingLobby = ({
 						{declinedCount > 0 && (
 							<div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
 								<p className="text-red-400 text-sm text-center">
-									{declinedCount} player(s) declined the invitation
+									{declinedCount} {declinedCount === 1 ? "person" : "people"}{" "}
+									declined the invitation
 								</p>
 							</div>
 						)}
+
+						{/* Session Type Badge */}
+						<div className="mt-4 text-center">
+							<span
+								className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+									isCollaboration
+										? "bg-purple-500/20 text-purple-400"
+										: "bg-[#5bc6ca]/20 text-[#5bc6ca]"
+								}`}
+							>
+								{isCollaboration ? "🤝 Collaboration Mode" : "⚔️ Match Mode"} •
+								Closed Session
+							</span>
+						</div>
 					</div>
 				</div>
 			</div>

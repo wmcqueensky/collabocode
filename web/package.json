@@ -13,11 +13,16 @@
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.77.0",
     "@types/react-router-dom": "^5.3.3",
+    "lib0": "^0.2.116",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.3",
-    "recharts": "^3.4.1"
+    "recharts": "^3.4.1",
+    "ws": "^8.18.3",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.28"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

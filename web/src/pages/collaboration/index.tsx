@@ -1,22 +1,168 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, Code, Clock, Settings, ArrowLeft } from "lucide-react";
+import * as Y from "yjs";
+import { Awareness } from "y-protocols/awareness";
+import {
+	Users,
+	Clock,
+	Code,
+	Play,
+	Send,
+	ChevronLeft,
+	Menu,
+	MessageSquare,
+	CheckCircle,
+	Rocket,
+	Wifi,
+	WifiOff,
+} from "lucide-react";
+
+// Components
+import { OutputPanel } from "../match/editor/OutputPanel";
+import { ChatPanel } from "../match/chat/ChatPanel";
+import { WaitingLobby } from "../match/lobby/WaitingLobby";
+import { ProblemPanel } from "../match/problem-panel/ProblemPanel";
+import CollaborativeMonacoEditor from "./components/CollaborativeMonacoEditor";
+import WaitingForSubmissionModal from "./components/WaitingForSubmissionModal";
+
+// Services
 import { supabase } from "../../lib/supabase";
 import { sessionService } from "../../services/sessionService";
-import { WaitingLobby } from "../match/lobby/WaitingLobby";
+import { executeCode } from "../../services/judge0Service";
+import { SupabaseYjsProvider } from "../../services/yjs/supabaseYjsProvider";
+import {
+	getUserColor,
+	type UserAwareness,
+	type CollaborationDocument,
+} from "../../services/yjs/collaborationDocument";
+
+// Types
 import type { Session, SessionParticipant } from "../../types/database";
+
+interface TestCase {
+	input: any;
+	output: any;
+	result?: string;
+	status: "pending" | "pass" | "fail" | "running";
+}
+
+/**
+ * Adapter class that wraps SupabaseYjsProvider to match CollaborationDocument interface
+ * This allows us to use single-file collaboration with the existing CollaborativeMonacoEditor
+ */
+class CollaborationDocumentAdapter implements CollaborationDocument {
+	public readonly provider: SupabaseYjsProvider;
+	public readonly sessionId: string;
+	public readonly fileId: string;
+	private _isConnected: boolean = false;
+
+	constructor(
+		provider: SupabaseYjsProvider,
+		sessionId: string,
+		fileId: string = "main"
+	) {
+		this.provider = provider;
+		this.sessionId = sessionId;
+		this.fileId = fileId;
+	}
+
+	get ydoc(): Y.Doc {
+		return this.provider.doc;
+	}
+
+	get awareness(): Awareness {
+		return this.provider.awareness;
+	}
+
+	getText(): Y.Text {
+		return this.provider.doc.getText("content");
+	}
+
+	connect(): void {
+		// Already connected via provider
+		this._isConnected = true;
+	}
+
+	disconnect(): void {
+		this.provider.destroy();
+		this._isConnected = false;
+	}
+
+	isConnected(): boolean {
+		return this._isConnected;
+	}
+
+	updateCursor(cursor: { lineNumber: number; column: number } | null): void {
+		const localState = this.provider.awareness.getLocalState() as UserAwareness;
+		this.provider.setLocalState({
+			...localState,
+			cursor,
+		});
+	}
+}
 
 export default function CollaborationPage() {
 	const { sessionId } = useParams<{ sessionId: string }>();
 	const navigate = useNavigate();
 
-	// State
+	// Session state
 	const [session, setSession] = useState<Session | null>(null);
 	const [participants, setParticipants] = useState<SessionParticipant[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [currentUserId, setCurrentUserId] = useState<string>("");
+	const [currentUserName, setCurrentUserName] = useState<string>("");
 	const [showWaitingLobby, setShowWaitingLobby] = useState(true);
+
+	// Timer state
+	const [seconds, setSeconds] = useState(0);
+	const [timeStr, setTimeStr] = useState("00:00");
+
+	// Yjs Collaboration state - single shared document
+	const yjsProviderRef = useRef<SupabaseYjsProvider | null>(null);
+	const [collaborationDoc, setCollaborationDoc] =
+		useState<CollaborationDocument | null>(null);
+	const [isYjsConnected, setIsYjsConnected] = useState(false);
+	const [remoteCursors, setRemoteCursors] = useState<
+		Map<number, UserAwareness>
+	>(new Map());
+
+	// Editor state
+	const [starterCode, setStarterCode] = useState<string>("");
+	const [output, setOutput] = useState<
+		Array<{ message: string; status: string }>
+	>([{ message: "// Console output will appear here", status: "normal" }]);
+	const [testCases, setTestCases] = useState<TestCase[]>([]);
+
+	// UI state
+	const [isChatOpen, setIsChatOpen] = useState(true);
+	const [isMicOn, setIsMicOn] = useState(false);
+	const [activeProblemTab, setActiveProblemTab] = useState("description");
+	const [mobileView, setMobileView] = useState<"code" | "problem" | "chat">(
+		"code"
+	);
+	const [isMobile, setIsMobile] = useState(false);
+
+	// Submission state
+	const [hasSubmitted, setHasSubmitted] = useState(false);
+	const [showWaitingModal, setShowWaitingModal] = useState(false);
+
+	// Check screen size
+	useEffect(() => {
+		const checkScreenSize = () => {
+			const mobile = window.innerWidth < 768;
+			setIsMobile(mobile);
+			if (mobile) {
+				setIsChatOpen(false);
+			} else {
+				setIsChatOpen(true);
+			}
+		};
+
+		checkScreenSize();
+		window.addEventListener("resize", checkScreenSize);
+		return () => window.removeEventListener("resize", checkScreenSize);
+	}, []);
 
 	// Load current user
 	useEffect(() => {
@@ -26,6 +172,16 @@ export default function CollaborationPage() {
 			} = await supabase.auth.getUser();
 			if (user) {
 				setCurrentUserId(user.id);
+
+				const { data: profile } = await supabase
+					.from("profiles")
+					.select("username")
+					.eq("id", user.id)
+					.single();
+
+				setCurrentUserName(
+					profile?.username || user.email?.split("@")[0] || "User"
+				);
 			} else {
 				navigate("/explore");
 			}
@@ -35,39 +191,65 @@ export default function CollaborationPage() {
 
 	// Load session data
 	useEffect(() => {
-		if (!sessionId) return;
+		if (!sessionId || !currentUserId) return;
 
 		const loadSession = async () => {
 			try {
 				setLoading(true);
 
-				// Fetch session
 				const sessionData = await sessionService.getSessionById(sessionId);
 				if (!sessionData) {
 					setError("Session not found");
 					return;
 				}
 
-				// Verify this is a collaboration session
+				// Redirect if wrong session type
 				if (sessionData.type !== "collaboration") {
-					console.warn("This is not a collaboration session, redirecting...");
 					navigate(`/match/${sessionId}`);
 					return;
 				}
 
 				setSession(sessionData);
 
-				// Fetch participants
 				const participantsData = await sessionService.getSessionParticipants(
 					sessionId
 				);
 				setParticipants(participantsData);
 
-				// Determine if we should show waiting lobby
+				// Check if current user has already submitted
+				const currentParticipant = participantsData.find(
+					(p) => p.user_id === currentUserId
+				);
+				if (currentParticipant?.submission_time) {
+					setHasSubmitted(true);
+					setShowWaitingModal(true);
+				}
+
+				// Check session status
 				if (sessionData.status === "in_progress") {
 					setShowWaitingLobby(false);
 				} else if (sessionData.status === "completed") {
-					navigate("/explore");
+					navigate(`/collaboration-summary/${sessionId}`);
+					return;
+				}
+
+				// Initialize test cases from problem
+				if (sessionData.problem?.test_cases) {
+					const cases = sessionData.problem.test_cases.map((tc: any) => ({
+						input: tc.input,
+						output: tc.output,
+						status: "pending" as const,
+					}));
+					setTestCases(cases);
+				}
+
+				// Get starter code
+				if (sessionData.problem?.starter_code) {
+					const code =
+						sessionData.problem.starter_code[sessionData.language] ||
+						sessionData.problem.starter_code.javascript ||
+						"// Start coding here";
+					setStarterCode(code);
 				}
 			} catch (err: any) {
 				console.error("Error loading session:", err);
@@ -78,14 +260,86 @@ export default function CollaborationPage() {
 		};
 
 		loadSession();
-	}, [sessionId, navigate]);
+	}, [sessionId, currentUserId, navigate]);
 
-	// Subscribe to real-time updates
+	// Initialize Yjs provider for shared collaboration document
 	useEffect(() => {
-		if (!sessionId) return;
+		if (
+			!sessionId ||
+			!currentUserId ||
+			!currentUserName ||
+			showWaitingLobby ||
+			!session
+		) {
+			return;
+		}
 
-		const channel = supabase
-			.channel(`collaboration-session:${sessionId}`)
+		// Create single shared document for the session
+		const roomName = `collab-${sessionId}`;
+		const doc = new Y.Doc();
+
+		const provider = new SupabaseYjsProvider(roomName, doc, currentUserId);
+
+		// Set user awareness (cursor color, name)
+		const colors = getUserColor(currentUserId);
+		provider.setLocalState({
+			user: {
+				id: currentUserId,
+				name: currentUserName,
+				color: colors.color,
+				colorLight: colors.light,
+			},
+			cursor: null,
+		});
+
+		// Handle sync
+		provider.onSync(() => {
+			console.log(`[Yjs] Synced for collaboration session: ${sessionId}`);
+			setIsYjsConnected(true);
+
+			// Initialize with starter code if document is empty
+			const ytext = provider.doc.getText("content");
+			if (ytext.toString() === "" && starterCode) {
+				ytext.insert(0, starterCode);
+			}
+
+			// Create the adapter that implements CollaborationDocument interface
+			const adapter = new CollaborationDocumentAdapter(
+				provider,
+				sessionId,
+				"main"
+			);
+			adapter.connect();
+			setCollaborationDoc(adapter);
+		});
+
+		// Handle awareness changes (remote cursors)
+		provider.onAwarenessChange((states) => {
+			setRemoteCursors(states);
+		});
+
+		yjsProviderRef.current = provider;
+
+		return () => {
+			provider.destroy();
+			yjsProviderRef.current = null;
+			setCollaborationDoc(null);
+		};
+	}, [
+		sessionId,
+		currentUserId,
+		currentUserName,
+		showWaitingLobby,
+		session,
+		starterCode,
+	]);
+
+	// Subscribe to real-time participant updates
+	useEffect(() => {
+		if (!sessionId || showWaitingLobby) return;
+
+		const participantChannel = supabase
+			.channel(`collaboration-participants:${sessionId}`)
 			.on(
 				"postgres_changes",
 				{
@@ -95,13 +349,16 @@ export default function CollaborationPage() {
 					filter: `session_id=eq.${sessionId}`,
 				},
 				async () => {
-					// Reload participants
-					const participantsData = await sessionService.getSessionParticipants(
+					const updated = await sessionService.getSessionParticipants(
 						sessionId
 					);
-					setParticipants(participantsData);
+					setParticipants(updated);
 				}
 			)
+			.subscribe();
+
+		const sessionChannel = supabase
+			.channel(`collaboration-session:${sessionId}`)
 			.on(
 				"postgres_changes",
 				{
@@ -110,13 +367,11 @@ export default function CollaborationPage() {
 					table: "sessions",
 					filter: `id=eq.${sessionId}`,
 				},
-				async (payload) => {
-					const updatedSession = payload.new as any;
-					setSession((prev) => (prev ? { ...prev, ...updatedSession } : null));
+				(payload) => {
+					const updated = payload.new as Session;
+					setSession((prev) => (prev ? { ...prev, ...updated } : null));
 
-					if (updatedSession.status === "in_progress") {
-						setShowWaitingLobby(false);
-					} else if (updatedSession.status === "completed") {
+					if (updated.status === "completed") {
 						navigate(`/collaboration-summary/${sessionId}`);
 					}
 				}
@@ -124,11 +379,39 @@ export default function CollaborationPage() {
 			.subscribe();
 
 		return () => {
-			supabase.removeChannel(channel);
+			supabase.removeChannel(participantChannel);
+			supabase.removeChannel(sessionChannel);
 		};
-	}, [sessionId, navigate]);
+	}, [sessionId, showWaitingLobby, navigate]);
 
-	// Handle starting the session (host only)
+	// Timer effect
+	useEffect(() => {
+		if (!session || showWaitingLobby || !session.started_at) return;
+
+		const startTime = new Date(session.started_at).getTime();
+		const totalTime = session.time_limit * 60 * 1000;
+
+		const updateTimer = () => {
+			const elapsed = Date.now() - startTime;
+			const remaining = Math.max(0, totalTime - elapsed);
+			const remainingSeconds = Math.floor(remaining / 1000);
+
+			setSeconds(remainingSeconds);
+			const mins = Math.floor(remainingSeconds / 60);
+			const secs = remainingSeconds % 60;
+			setTimeStr(`${mins}:${secs.toString().padStart(2, "0")}`);
+
+			if (remainingSeconds === 0 && !hasSubmitted) {
+				handleSubmit();
+			}
+		};
+
+		updateTimer();
+		const interval = setInterval(updateTimer, 1000);
+		return () => clearInterval(interval);
+	}, [session, showWaitingLobby, hasSubmitted]);
+
+	// Handle start session
 	const handleStartSession = async () => {
 		if (!session || !sessionId) return;
 
@@ -141,20 +424,144 @@ export default function CollaborationPage() {
 		}
 	};
 
-	// Handle leaving the session
-	const handleLeaveSession = async () => {
-		if (!sessionId || !currentUserId) return;
+	// Get current code from Yjs document
+	const getCurrentCode = useCallback((): string => {
+		if (yjsProviderRef.current) {
+			return yjsProviderRef.current.doc.getText("content").toString();
+		}
+		return starterCode;
+	}, [starterCode]);
+
+	// Handle run code
+	const handleRun = async () => {
+		if (!session) {
+			setOutput([{ message: "No session loaded", status: "fail" }]);
+			return;
+		}
+
+		const code = getCurrentCode();
+		setOutput([{ message: "Running code...", status: "normal" }]);
 
 		try {
-			await sessionService.updateParticipantStatus(
-				sessionId,
-				currentUserId,
-				"left"
+			const results = await Promise.all(
+				testCases.map(async (testCase) => {
+					try {
+						const result = await executeCode(
+							code,
+							session.language,
+							JSON.stringify(testCase.input)
+						);
+						const passed =
+							result.status === "success" &&
+							result.output?.trim() === JSON.stringify(testCase.output);
+						return {
+							...testCase,
+							result: result.output?.trim() || "",
+							status: passed ? ("pass" as const) : ("fail" as const),
+						};
+					} catch {
+						return { ...testCase, result: "Error", status: "fail" as const };
+					}
+				})
 			);
-			navigate("/explore");
+
+			setTestCases(results);
+
+			const passedCount = results.filter((r) => r.status === "pass").length;
+			const newOutput = results.flatMap((result, index) => [
+				{ message: `Running test case ${index + 1}...`, status: "normal" },
+				{
+					message:
+						result.status === "pass"
+							? `✓ Test case ${index + 1} passed`
+							: `✗ Test case ${index + 1} failed`,
+					status: result.status,
+				},
+			]);
+			newOutput.push({
+				message: `${passedCount}/${results.length} test cases passed`,
+				status: passedCount === results.length ? "pass" : "fail",
+			});
+
+			setOutput(newOutput);
 		} catch (err: any) {
-			console.error("Error leaving session:", err);
+			setOutput([
+				{ message: "Error running code", status: "fail" },
+				{ message: err.message || "Unknown error", status: "fail" },
+			]);
 		}
+	};
+
+	// Handle submit
+	const handleSubmit = async () => {
+		if (!sessionId || !session || hasSubmitted) return;
+
+		setOutput([{ message: "Submitting solution...", status: "normal" }]);
+
+		try {
+			const code = getCurrentCode();
+
+			// Run tests
+			const results = await Promise.all(
+				testCases.map(async (testCase) => {
+					try {
+						const result = await executeCode(
+							code,
+							session.language,
+							JSON.stringify(testCase.input)
+						);
+						return (
+							result.status === "success" &&
+							result.output?.trim() === JSON.stringify(testCase.output)
+						);
+					} catch {
+						return false;
+					}
+				})
+			);
+
+			const allPassed = results.every((r) => r);
+			const passedCount = results.filter((r) => r).length;
+
+			// Submit to database
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (user) {
+				await supabase
+					.from("session_participants")
+					.update({
+						submission_time: new Date().toISOString(),
+						code_snapshot: code,
+						is_correct: allPassed,
+						test_results: { passedCount, totalCount: results.length, results },
+					})
+					.eq("session_id", sessionId)
+					.eq("user_id", user.id);
+			}
+
+			setHasSubmitted(true);
+			setShowWaitingModal(true);
+
+			setOutput([
+				{ message: "✓ Solution submitted successfully!", status: "pass" },
+				{
+					message: `${passedCount}/${results.length} test cases passed`,
+					status: allPassed ? "pass" : "fail",
+				},
+			]);
+		} catch (err: any) {
+			console.error("Error submitting:", err);
+			setOutput([
+				{ message: "Error submitting solution", status: "fail" },
+				{ message: err.message || "Unknown error", status: "fail" },
+			]);
+		}
+	};
+
+	// Handle all submitted - navigate back to explore
+	const handleAllSubmitted = () => {
+		navigate("/explore");
 	};
 
 	// Loading state
@@ -162,7 +569,7 @@ export default function CollaborationPage() {
 		return (
 			<div className="flex items-center justify-center h-screen bg-[#171717]">
 				<div className="text-center">
-					<div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+					<div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
 					<p className="text-gray-400">Loading collaboration session...</p>
 				</div>
 			</div>
@@ -178,16 +585,15 @@ export default function CollaborationPage() {
 				</div>
 				<button
 					onClick={() => navigate("/explore")}
-					className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+					className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg"
 				>
-					<ArrowLeft size={18} />
 					Back to Explore
 				</button>
 			</div>
 		);
 	}
 
-	// Show waiting lobby if session hasn't started
+	// Waiting lobby
 	if (showWaitingLobby) {
 		return (
 			<WaitingLobby
@@ -199,180 +605,311 @@ export default function CollaborationPage() {
 		);
 	}
 
-	// Main collaboration view (placeholder for now)
+	// File info for the editor
+	const file = {
+		id: sessionId || "main",
+		filename: `solution.${
+			session.language === "javascript"
+				? "js"
+				: session.language === "typescript"
+				? "ts"
+				: "py"
+		}`,
+		language: session.language,
+		content: starterCode,
+	};
+
 	return (
-		<div className="min-h-screen bg-[#171717] text-white">
-			{/* Header */}
-			<header className="bg-[#1f1f1f] border-b border-gray-700 px-4 py-3">
-				<div className="max-w-7xl mx-auto flex items-center justify-between">
-					<div className="flex items-center gap-4">
-						<button
-							onClick={handleLeaveSession}
-							className="text-gray-400 hover:text-white transition"
-						>
-							<ArrowLeft size={20} />
-						</button>
-						<div>
-							<h1 className="text-xl font-bold flex items-center gap-2">
-								<Users size={20} className="text-purple-500" />
-								Collaboration Session
-							</h1>
-							<p className="text-sm text-gray-400">{session.problem?.title}</p>
-						</div>
-					</div>
+		<div className="flex flex-col h-screen bg-[#171717] text-gray-200">
+			{/* Waiting for Submission Modal */}
+			<WaitingForSubmissionModal
+				isOpen={showWaitingModal}
+				participants={participants}
+				currentUserId={currentUserId}
+				onAllSubmitted={handleAllSubmitted}
+			/>
 
-					<div className="flex items-center gap-4">
-						<div className="flex items-center gap-2 text-sm text-gray-400">
-							<Clock size={16} />
-							<span>{session.time_limit} min</span>
-						</div>
-						<div className="flex items-center gap-2 text-sm text-gray-400">
-							<Code size={16} />
-							<span className="capitalize">{session.language}</span>
-						</div>
-						<div className="flex items-center gap-2 text-sm text-gray-400">
-							<Users size={16} />
-							<span>
-								{participants.filter((p) => p.status === "joined").length}/
-								{session.max_players}
-							</span>
-						</div>
-					</div>
-				</div>
-			</header>
-
-			{/* Main Content Area */}
-			<main className="p-4 max-w-7xl mx-auto">
-				{/* Session Info Card */}
-				<div className="bg-[#1f1f1f] border border-gray-700 rounded-xl p-6 mb-6">
-					<div className="flex items-start justify-between mb-4">
-						<div>
-							<h2 className="text-2xl font-bold text-white mb-2">
-								{session.problem?.title || "Collaboration Project"}
-							</h2>
-							<p className="text-gray-400 max-w-2xl">
-								{session.problem?.description || "No description available."}
-							</p>
-						</div>
-						<span
-							className={`px-3 py-1 rounded-full text-sm font-medium ${
-								session.problem?.difficulty === "Easy"
-									? "bg-green-500/20 text-green-400"
-									: session.problem?.difficulty === "Medium"
-									? "bg-yellow-500/20 text-yellow-400"
-									: "bg-red-500/20 text-red-400"
-							}`}
-						>
-							{session.problem?.difficulty || "Medium"}
+			{/* Navbar */}
+			<nav className="flex items-center justify-between px-3 py-2 bg-[#2c2c2c] border-b border-gray-700">
+				<div className="flex items-center space-x-3">
+					<button
+						onClick={() => navigate("/explore")}
+						className="p-1.5 hover:bg-gray-700 rounded text-gray-400"
+					>
+						<ChevronLeft size={18} />
+					</button>
+					<div className="flex items-center space-x-2">
+						<Rocket size={18} className="text-purple-500" />
+						<span className="font-medium text-white truncate max-w-[200px]">
+							{session.problem?.title || "Collaboration"}
 						</span>
 					</div>
 
-					{/* Tags */}
-					{session.problem?.tags && session.problem.tags.length > 0 && (
-						<div className="flex flex-wrap gap-2 mb-4">
-							{session.problem.tags
-								.filter((tag) => tag !== "collaboration")
-								.map((tag, index) => (
-									<span
-										key={index}
-										className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded-full text-xs"
+					{/* Connection Status */}
+					<div className="flex items-center space-x-1 text-xs">
+						{isYjsConnected ? (
+							<div className="flex items-center text-green-400">
+								<Wifi size={12} className="mr-1" />
+								<span className="hidden sm:inline">Live</span>
+							</div>
+						) : (
+							<div className="flex items-center text-yellow-400">
+								<WifiOff size={12} className="mr-1 animate-pulse" />
+								<span className="hidden sm:inline">Connecting...</span>
+							</div>
+						)}
+					</div>
+				</div>
+
+				<div className="flex items-center space-x-3">
+					{/* Active Collaborators */}
+					<div className="hidden sm:flex items-center space-x-1">
+						<div className="flex -space-x-2">
+							{Array.from(remoteCursors.values())
+								.filter((state) => state.user?.id !== currentUserId)
+								.slice(0, 3)
+								.map((state, i) => (
+									<div
+										key={state.user?.id || i}
+										className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border-2 border-gray-800"
+										style={{ backgroundColor: state.user?.color }}
+										title={state.user?.name}
 									>
-										{tag}
-									</span>
+										{state.user?.name?.charAt(0).toUpperCase()}
+									</div>
 								))}
 						</div>
-					)}
-
-					{/* Session Description */}
-					{session.description && (
-						<div className="mt-4 p-3 bg-[#2a2a2a] rounded-lg">
-							<p className="text-sm text-gray-300">
-								<span className="text-gray-500">Session goal: </span>
-								{session.description}
-							</p>
-						</div>
-					)}
-				</div>
-
-				{/* Collaborators */}
-				<div className="bg-[#1f1f1f] border border-gray-700 rounded-xl p-6 mb-6">
-					<h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-						<Users size={18} className="text-purple-500" />
-						Collaborators
-					</h3>
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-						{participants
-							.filter((p) => p.status === "joined")
-							.map((participant) => (
-								<div
-									key={participant.id}
-									className={`p-4 rounded-lg border ${
-										participant.user_id === currentUserId
-											? "border-purple-500 bg-purple-500/10"
-											: "border-gray-700 bg-[#2a2a2a]"
-									}`}
-								>
-									<div className="flex items-center gap-3">
-										<div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium">
-											{participant.user?.username?.charAt(0).toUpperCase() ||
-												"?"}
-										</div>
-										<div>
-											<p className="font-medium text-white">
-												{participant.user?.username || "Unknown"}
-												{participant.user_id === currentUserId && (
-													<span className="text-purple-400 ml-2">(You)</span>
-												)}
-											</p>
-											<p className="text-xs text-gray-400">
-												{participant.role === "host" ? "Host" : "Collaborator"}
-											</p>
-										</div>
-									</div>
-								</div>
-							))}
+						{remoteCursors.size > 0 && (
+							<span className="text-xs text-gray-400 ml-1">
+								{remoteCursors.size} online
+							</span>
+						)}
 					</div>
-				</div>
 
-				{/* Placeholder for collaborative editor */}
-				<div className="bg-[#1f1f1f] border border-gray-700 rounded-xl p-6">
-					<div className="flex items-center justify-center h-96">
-						<div className="text-center">
-							<Settings
-								size={64}
-								className="text-gray-600 mx-auto mb-4 animate-spin-slow"
-							/>
-							<h3 className="text-xl font-semibold text-gray-400 mb-2">
-								Collaborative Editor Coming Soon
-							</h3>
-							<p className="text-gray-500 max-w-md">
-								The real-time collaborative coding environment is being built.
-								You'll be able to code together with your team in real-time!
-							</p>
-						</div>
+					{/* Timer */}
+					<div className="flex items-center space-x-1 px-2 py-1 bg-gray-700 rounded text-sm">
+						<Clock
+							size={14}
+							className={seconds < 300 ? "text-red-400" : "text-gray-400"}
+						/>
+						<span className={seconds < 300 ? "text-red-400" : "text-white"}>
+							{timeStr}
+						</span>
 					</div>
-				</div>
 
-				{/* Session Actions */}
-				<div className="mt-6 flex justify-end gap-4">
+					{/* Run & Submit */}
 					<button
-						onClick={handleLeaveSession}
-						className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+						onClick={handleRun}
+						className="flex items-center space-x-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
 					>
-						Leave Session
+						<Play size={14} />
+						<span className="hidden sm:inline">Run</span>
 					</button>
-					{session.host_id === currentUserId && (
-						<button
-							onClick={() =>
-								sessionService.updateSessionStatus(sessionId!, "completed")
-							}
-							className="px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition"
-						>
-							End Collaboration
-						</button>
-					)}
+					<button
+						onClick={handleSubmit}
+						disabled={hasSubmitted}
+						className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm ${
+							hasSubmitted
+								? "bg-green-600 text-white cursor-not-allowed"
+								: "bg-purple-500 hover:bg-purple-600 text-white"
+						}`}
+					>
+						{hasSubmitted ? <CheckCircle size={14} /> : <Send size={14} />}
+						<span className="hidden sm:inline">
+							{hasSubmitted ? "Submitted" : "Submit"}
+						</span>
+					</button>
 				</div>
-			</main>
+			</nav>
+
+			{/* Mobile Navigation */}
+			{isMobile && (
+				<div className="flex bg-[#2c2c2c] border-b border-gray-700">
+					<button
+						className={`flex-1 py-2 text-xs flex items-center justify-center space-x-1 ${
+							mobileView === "problem"
+								? "bg-purple-500 text-white"
+								: "text-gray-400"
+						}`}
+						onClick={() => setMobileView("problem")}
+					>
+						<Menu size={14} />
+						<span>Problem</span>
+					</button>
+					<button
+						className={`flex-1 py-2 text-xs flex items-center justify-center space-x-1 ${
+							mobileView === "code"
+								? "bg-purple-500 text-white"
+								: "text-gray-400"
+						}`}
+						onClick={() => setMobileView("code")}
+					>
+						<Code size={14} />
+						<span>Code</span>
+					</button>
+					<button
+						className={`flex-1 py-2 text-xs flex items-center justify-center space-x-1 ${
+							mobileView === "chat"
+								? "bg-purple-500 text-white"
+								: "text-gray-400"
+						}`}
+						onClick={() => setMobileView("chat")}
+					>
+						<MessageSquare size={14} />
+						<span>Chat</span>
+					</button>
+				</div>
+			)}
+
+			{/* Main Content */}
+			<div className="flex flex-1 overflow-hidden">
+				{/* Desktop Layout */}
+				{!isMobile && (
+					<>
+						{/* Problem Panel */}
+						<ProblemPanel
+							activeTab={activeProblemTab}
+							setActiveTab={setActiveProblemTab}
+							testCases={testCases}
+							runTest={handleRun}
+							problem={session.problem}
+						/>
+
+						{/* Code Editor Section */}
+						<div className="flex flex-col flex-1 border-l border-r border-gray-700">
+							{/* File Tab */}
+							<div className="flex items-center px-3 py-2 bg-[#2c2c2c] border-b border-gray-700">
+								<div className="flex items-center space-x-2 px-3 py-1 bg-[#171717] rounded text-sm text-white">
+									<Code size={14} className="text-purple-400" />
+									<span>{file.filename}</span>
+									{isYjsConnected && (
+										<span className="text-green-400 text-xs">● Live</span>
+									)}
+								</div>
+							</div>
+
+							{/* Collaborative Monaco Editor */}
+							<CollaborativeMonacoEditor
+								file={file}
+								collaborationDoc={collaborationDoc}
+								userId={currentUserId}
+							/>
+
+							{/* Output Panel */}
+							<OutputPanel output={output} />
+						</div>
+
+						{/* Right Panel - Chat */}
+						{isChatOpen && (
+							<div className="w-80 flex flex-col bg-[#1a1a1a] border-l border-gray-700">
+								<ChatPanel
+									isMicOn={isMicOn}
+									setIsMicOn={setIsMicOn}
+									sessionId={sessionId}
+								/>
+							</div>
+						)}
+					</>
+				)}
+
+				{/* Mobile Layout */}
+				{isMobile && (
+					<div className="flex flex-col flex-1 overflow-hidden">
+						{mobileView === "problem" && (
+							<div className="flex-1 overflow-hidden">
+								<ProblemPanel
+									activeTab={activeProblemTab}
+									setActiveTab={setActiveProblemTab}
+									testCases={testCases}
+									runTest={handleRun}
+									problem={session.problem}
+									isMobile={true}
+								/>
+							</div>
+						)}
+
+						{mobileView === "code" && (
+							<div className="flex flex-col flex-1 overflow-hidden">
+								<CollaborativeMonacoEditor
+									file={file}
+									collaborationDoc={collaborationDoc}
+									userId={currentUserId}
+									isMobile={true}
+								/>
+								<OutputPanel output={output} isMobile={true} />
+							</div>
+						)}
+
+						{mobileView === "chat" && (
+							<div className="flex-1 overflow-hidden">
+								<ChatPanel
+									isMicOn={isMicOn}
+									setIsMicOn={setIsMicOn}
+									sessionId={sessionId}
+									isMobile={true}
+								/>
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+
+			{/* Footer - Desktop */}
+			{!isMobile && (
+				<div className="flex items-center justify-between px-4 py-2 bg-[#2c2c2c] border-t border-gray-700 text-xs text-gray-400">
+					<div className="flex items-center space-x-4">
+						<span className="text-purple-400 font-medium">
+							Collaboration Mode
+						</span>
+						<span>{session.language}</span>
+						{isYjsConnected && (
+							<span className="text-green-400">● Real-time sync active</span>
+						)}
+					</div>
+					<div className="flex items-center space-x-4">
+						<button
+							onClick={() => setIsChatOpen(!isChatOpen)}
+							className={`px-2 py-1 rounded ${
+								isChatOpen
+									? "bg-purple-500/20 text-purple-400"
+									: "hover:bg-gray-700"
+							}`}
+						>
+							{isChatOpen ? "Hide Chat" : "Show Chat"}
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Footer - Mobile */}
+			{isMobile && (
+				<div className="flex items-center justify-between px-3 py-2 bg-[#2c2c2c] border-t border-gray-700 text-xs">
+					<div className="flex items-center space-x-2 text-gray-400">
+						<Clock size={12} />
+						<span>{timeStr}</span>
+						{isYjsConnected && <span className="text-green-400">●</span>}
+					</div>
+					<div className="flex items-center space-x-2">
+						<button
+							onClick={handleRun}
+							className="px-3 py-1.5 bg-gray-700 text-white rounded text-xs"
+						>
+							Run
+						</button>
+						<button
+							onClick={handleSubmit}
+							disabled={hasSubmitted}
+							className={`px-3 py-1.5 rounded text-xs ${
+								hasSubmitted
+									? "bg-green-600 text-white"
+									: "bg-purple-500 text-white"
+							}`}
+						>
+							{hasSubmitted ? "Done ✓" : "Submit"}
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

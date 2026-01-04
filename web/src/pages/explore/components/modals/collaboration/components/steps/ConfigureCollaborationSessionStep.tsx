@@ -1,20 +1,28 @@
-import { Clock, Users, Code, Globe, UserPlus } from "lucide-react";
+import { Clock, Code, Users, Rocket } from "lucide-react";
+import type { Problem } from "../../../../../../../types/database";
 
 type ConfigureCollaborationSessionStepProps = {
-	selectedProblem: any;
+	selectedProblem: Problem | null;
 	selectedLanguage: string;
-	setSelectedLanguage: (lang: string) => void;
+	setSelectedLanguage: (language: string) => void;
 	timeLimit: number;
-	setTimeLimit: (n: number) => void;
+	setTimeLimit: (limit: number) => void;
 	playerCount: number;
-	setPlayerCount: (n: number) => void;
-	isPublic: boolean;
-	setIsPublic: (v: boolean) => void;
-	allowJoinInProgress: boolean;
-	setAllowJoinInProgress: (v: boolean) => void;
-	description: string;
-	setDescription: (v: string) => void;
+	setPlayerCount: (count: number) => void;
 };
+
+const LANGUAGES = [
+	{ value: "javascript", label: "JavaScript" },
+	{ value: "typescript", label: "TypeScript" },
+	{ value: "python", label: "Python" },
+];
+
+const TIME_OPTIONS = [
+	{ value: 30, label: "30 minutes" },
+	{ value: 45, label: "45 minutes" },
+	{ value: 60, label: "60 minutes" },
+	{ value: 90, label: "90 minutes" },
+];
 
 const ConfigureCollaborationSessionStep = ({
 	selectedProblem,
@@ -24,272 +32,132 @@ const ConfigureCollaborationSessionStep = ({
 	setTimeLimit,
 	playerCount,
 	setPlayerCount,
-	isPublic,
-	setIsPublic,
-	allowJoinInProgress,
-	setAllowJoinInProgress,
-	description,
-	setDescription,
 }: ConfigureCollaborationSessionStepProps) => {
-	const programmingLanguages = [
-		{ id: "javascript", name: "JavaScript" },
-		{ id: "python", name: "Python" },
-		{ id: "java", name: "Java" },
-		{ id: "cpp", name: "C++" },
-		{ id: "csharp", name: "C#" },
-		{ id: "go", name: "Go" },
-		{ id: "ruby", name: "Ruby" },
-		{ id: "typescript", name: "TypeScript" },
-		{ id: "php", name: "PHP" },
-		{ id: "swift", name: "Swift" },
-		{ id: "kotlin", name: "Kotlin" },
-		{ id: "rust", name: "Rust" },
-	];
-
-	// Longer time limits for collaboration
-	const availableTimeLimits = [30, 45, 60, 90, 120, 180];
-	const availablePlayerCounts = [2, 3, 4];
-
-	const getDifficultyColor = (difficulty: any) => {
-		if (!difficulty) return "text-gray-500";
-		switch (String(difficulty).toLowerCase()) {
-			case "easy":
-				return "text-green-500";
-			case "medium":
-				return "text-yellow-500";
-			case "hard":
-				return "text-red-500";
-			default:
-				return "text-gray-500";
-		}
-	};
-
-	if (!selectedProblem) {
-		return (
-			<div className="p-6 flex items-center justify-center h-64">
-				<p className="text-gray-400">
-					Please select a project in the previous step first.
-				</p>
-			</div>
-		);
-	}
-
 	return (
-		<div className="p-6">
-			{/* Selected Problem Info */}
-			<div className="bg-[#2a2a2a] rounded-lg p-4 mb-6 border border-purple-500/30">
-				<h3 className="font-medium text-lg text-white flex items-center gap-2">
-					<Code size={20} className="text-purple-500" />
-					{selectedProblem?.title || "Project Title Missing"}
-				</h3>
-				<p
-					className={`text-sm font-medium mt-1 ${getDifficultyColor(
-						selectedProblem?.difficulty
-					)}`}
-				>
-					{selectedProblem?.difficulty || "N/A"}
-				</p>
-				<p className="text-gray-400 text-sm mt-2 line-clamp-2">
-					{selectedProblem?.description || "No description available."}
-				</p>
-			</div>
+		<div className="space-y-4 sm:space-y-6 py-2">
+			{/* Selected Problem Summary */}
+			{selectedProblem && (
+				<div className="bg-[#2a2a2a] rounded-lg p-3 sm:p-4 border border-purple-500/30">
+					<div className="flex items-start space-x-3">
+						<div className="p-2 bg-purple-500/20 rounded-lg">
+							<Rocket className="text-purple-400" size={20} />
+						</div>
+						<div className="flex-1 min-w-0">
+							<h3 className="font-medium text-white text-sm sm:text-base truncate">
+								{selectedProblem.title}
+							</h3>
+							<div className="flex flex-wrap items-center gap-2 mt-1">
+								<span
+									className={`px-2 py-0.5 rounded-full text-xs ${
+										selectedProblem.difficulty === "Easy"
+											? "bg-green-500/20 text-green-400"
+											: selectedProblem.difficulty === "Medium"
+											? "bg-yellow-500/20 text-yellow-400"
+											: "bg-red-500/20 text-red-400"
+									}`}
+								>
+									{selectedProblem.difficulty}
+								</span>
+								{selectedProblem.tags?.slice(0, 2).map((tag, i) => (
+									<span
+										key={i}
+										className="px-2 py-0.5 bg-gray-700 text-gray-300 rounded-full text-xs"
+									>
+										{tag}
+									</span>
+								))}
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 
-			{/* Session Description */}
-			<div className="mb-6">
-				<label className="block text-gray-200 font-medium mb-2">
-					Session Description (Optional)
+			{/* Language Selection */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Code size={16} className="mr-2 text-purple-400" />
+					Programming Language
 				</label>
-				<textarea
-					value={description}
-					onChange={(e) => setDescription(e.target.value)}
-					placeholder="Describe what you want to accomplish in this collaboration..."
-					className="w-full bg-[#2a2a2a] border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-					rows={2}
-				/>
-			</div>
-
-			{/* Configuration Options */}
-			<div className="grid md:grid-cols-3 gap-6 mb-6">
-				{/* Time Limit */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Clock size={18} className="text-purple-500" />
-						<h4>Time Limit</h4>
-					</div>
-					<div className="grid grid-cols-3 gap-2">
-						{availableTimeLimits.map((time) => (
-							<button
-								key={time}
-								className={`py-2 px-1 rounded-md text-center transition text-sm ${
-									timeLimit === time
-										? "bg-purple-500 text-white font-medium"
-										: "bg-[#3a3a3a] text-gray-300 hover:bg-[#4a4a4a]"
-								}`}
-								onClick={() => setTimeLimit(time)}
-							>
-								{time} min
-							</button>
-						))}
-					</div>
-					<p className="text-xs text-gray-400">
-						Collaboration sessions typically need more time
-					</p>
-				</div>
-
-				{/* Number of Collaborators */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Users size={18} className="text-purple-500" />
-						<h4>Collaborators</h4>
-					</div>
-					<div className="grid grid-cols-3 gap-2">
-						{availablePlayerCounts.map((count) => (
-							<button
-								key={count}
-								className={`py-2 px-1 rounded-md text-center transition ${
-									playerCount === count
-										? "bg-purple-500 text-white font-medium"
-										: "bg-[#3a3a3a] text-gray-300 hover:bg-[#4a4a4a]"
-								}`}
-								onClick={() => setPlayerCount(count)}
-							>
-								{count} {count === 1 ? "person" : "people"}
-							</button>
-						))}
-					</div>
-					<p className="text-xs text-gray-400">
-						Including you - invite {playerCount - 1} other{" "}
-						{playerCount - 1 === 1 ? "collaborator" : "collaborators"}
-					</p>
-				</div>
-
-				{/* Programming Language */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Code size={18} className="text-purple-500" />
-						<h4>Programming Language</h4>
-					</div>
-					<select
-						value={selectedLanguage}
-						onChange={(e) => setSelectedLanguage(e.target.value)}
-						className="w-full bg-[#3a3a3a] border border-gray-700 rounded-md py-2 px-3 text-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-					>
-						{programmingLanguages.map((lang) => (
-							<option key={lang.id} value={lang.id}>
-								{lang.name}
-							</option>
-						))}
-					</select>
-					<p className="text-xs text-gray-400">
-						Primary language for the session
-					</p>
+				<div className="grid grid-cols-3 gap-2">
+					{LANGUAGES.map((lang) => (
+						<button
+							key={lang.value}
+							onClick={() => setSelectedLanguage(lang.value)}
+							className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+								selectedLanguage === lang.value
+									? "bg-purple-500 text-white"
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
+						>
+							{lang.label}
+						</button>
+					))}
 				</div>
 			</div>
 
-			{/* Collaboration-Specific Options */}
-			<div className="bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 mb-6">
-				<h4 className="font-medium text-white mb-4 flex items-center gap-2">
-					<UserPlus size={18} className="text-purple-500" />
-					Collaboration Options
+			{/* Time Limit */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Clock size={16} className="mr-2 text-purple-400" />
+					Time Limit
+				</label>
+				<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+					{TIME_OPTIONS.map((option) => (
+						<button
+							key={option.value}
+							onClick={() => setTimeLimit(option.value)}
+							className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+								timeLimit === option.value
+									? "bg-purple-500 text-white"
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
+						>
+							{option.label}
+						</button>
+					))}
+				</div>
+			</div>
+
+			{/* Player Count */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Users size={16} className="mr-2 text-purple-400" />
+					Team Size
+				</label>
+				<div className="grid grid-cols-3 gap-2">
+					{[2, 3, 4].map((count) => (
+						<button
+							key={count}
+							onClick={() => setPlayerCount(count)}
+							className={`px-3 py-3 rounded-lg text-sm font-medium transition-all ${
+								playerCount === count
+									? "bg-purple-500 text-white"
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
+						>
+							<div className="flex flex-col items-center">
+								<span className="text-lg font-bold">{count}</span>
+								<span className="text-xs opacity-70">
+									{count === 2 ? "Pair" : count === 3 ? "Trio" : "Squad"}
+								</span>
+							</div>
+						</button>
+					))}
+				</div>
+			</div>
+
+			{/* Info Box */}
+			<div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+				<h4 className="text-purple-400 font-medium text-sm mb-2">
+					🤝 Real-Time Collaboration
 				</h4>
-
-				<div className="space-y-4">
-					{/* Public Session Toggle */}
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<Globe size={18} className="text-gray-400" />
-							<div>
-								<p className="text-white font-medium">Public Session</p>
-								<p className="text-xs text-gray-400">
-									Allow anyone to discover and request to join
-								</p>
-							</div>
-						</div>
-						<button
-							onClick={() => setIsPublic(!isPublic)}
-							className={`relative w-12 h-6 rounded-full transition-colors ${
-								isPublic ? "bg-purple-500" : "bg-gray-600"
-							}`}
-						>
-							<span
-								className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-									isPublic ? "left-7" : "left-1"
-								}`}
-							/>
-						</button>
-					</div>
-
-					{/* Allow Join In Progress Toggle */}
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<UserPlus size={18} className="text-gray-400" />
-							<div>
-								<p className="text-white font-medium">Allow Late Joiners</p>
-								<p className="text-xs text-gray-400">
-									Let collaborators join after the session starts
-								</p>
-							</div>
-						</div>
-						<button
-							onClick={() => setAllowJoinInProgress(!allowJoinInProgress)}
-							className={`relative w-12 h-6 rounded-full transition-colors ${
-								allowJoinInProgress ? "bg-purple-500" : "bg-gray-600"
-							}`}
-						>
-							<span
-								className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-									allowJoinInProgress ? "left-7" : "left-1"
-								}`}
-							/>
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{/* Session Settings Preview */}
-			<div className="p-4 bg-[#2a2a2a] border border-purple-500/30 rounded-lg">
-				<h4 className="font-medium text-white mb-2">Session Preview</h4>
-				<div className="grid sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-					<div>
-						<span className="text-gray-400">Project:</span>
-						<span className="text-white ml-2">
-							{selectedProblem?.title || "N/A"}
-						</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Time Limit:</span>
-						<span className="text-white ml-2">{timeLimit} minutes</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Collaborators:</span>
-						<span className="text-white ml-2">{playerCount}</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Difficulty:</span>
-						<span
-							className={`ml-2 ${getDifficultyColor(
-								selectedProblem?.difficulty
-							)}`}
-						>
-							{selectedProblem?.difficulty || "N/A"}
-						</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Language:</span>
-						<span className="text-white ml-2">
-							{
-								programmingLanguages.find((l) => l.id === selectedLanguage)
-									?.name
-							}
-						</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Visibility:</span>
-						<span className="text-white ml-2">
-							{isPublic ? "Public" : "Private"}
-						</span>
-					</div>
-				</div>
+				<ul className="text-gray-400 text-xs space-y-1">
+					<li>• All team members edit the same code file in real-time</li>
+					<li>• See your teammates' cursors as they type</li>
+					<li>• Use chat to discuss your approach and strategy</li>
+					<li>• Work together to solve the problem before time runs out</li>
+					<li>• All members must submit when the solution is ready</li>
+				</ul>
 			</div>
 		</div>
 	);

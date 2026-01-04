@@ -1,10 +1,11 @@
 import { supabase } from "../lib/supabase";
 import { matchService } from "./matchService";
+import type { SessionType } from "../types/database";
 
 /**
- * Match Completion Service
- * Handles the finalization of matches including rankings, history, and notifications
- * Uses atomic operations and proper synchronization to prevent race conditions
+ * Session Completion Service
+ * Handles the finalization of both match and collaboration sessions
+ * including rankings, history, and notifications
  */
 export const matchCompletionService = {
 	// Global listener reference
@@ -46,21 +47,21 @@ export const matchCompletionService = {
 	},
 
 	/**
-	 * Check if all participants have submitted and finalize match
+	 * Check if all participants have submitted and finalize session
 	 */
-	async checkAndFinalizeMatch(sessionId: string): Promise<boolean> {
+	async checkAndFinalizeSession(sessionId: string): Promise<boolean> {
 		// Try to acquire lock
 		if (!this.acquireLock(sessionId)) {
 			return false;
 		}
 
 		try {
-			console.log("🏁 Starting match finalization check for:", sessionId);
+			console.log("🏁 Starting session finalization check for:", sessionId);
 
 			// Step 1: Get session status directly from DB
 			const { data: session, error: sessionError } = await supabase
 				.from("sessions")
-				.select("id, status, problem_id")
+				.select("id, status, problem_id, type")
 				.eq("id", sessionId)
 				.single();
 
@@ -68,6 +69,9 @@ export const matchCompletionService = {
 				console.log("❌ Session not found:", sessionId);
 				return false;
 			}
+
+			const sessionType: SessionType = session.type || "match";
+			console.log(`📊 Session type: ${sessionType}`);
 
 			if (session.status === "completed") {
 				console.log("✅ Session already completed:", sessionId);
@@ -131,15 +135,14 @@ export const matchCompletionService = {
 
 				if (unrankedCount > 0) {
 					console.error(`❌ ${unrankedCount} participants still unranked`);
-					// Retry once more
 					await matchService.calculateRankings(sessionId);
 					await new Promise((resolve) => setTimeout(resolve, 200));
 				}
 
-				// Step 7: Record match history
-				console.log("📝 Recording match history...");
-				await matchService.recordMatchHistory(sessionId);
-				console.log("✅ Match history recorded");
+				// Step 7: Record session history
+				console.log("📝 Recording session history...");
+				await matchService.recordSessionHistory(sessionId);
+				console.log("✅ Session history recorded");
 
 				// Step 8: Update session status to completed
 				const { error: completeError } = await supabase
@@ -162,10 +165,13 @@ export const matchCompletionService = {
 
 				// Step 9: Create notifications
 				console.log("📧 Creating notifications...");
-				await this.createSummaryNotifications(sessionId);
+				await this.createSummaryNotifications(sessionId, sessionType);
 				console.log("✅ Notifications created");
 
-				console.log("🎉 Match finalized successfully:", sessionId);
+				console.log(
+					`🎉 ${sessionType} session finalized successfully:`,
+					sessionId
+				);
 				return true;
 			} catch (innerError) {
 				// Reset status on error
@@ -181,19 +187,30 @@ export const matchCompletionService = {
 				throw innerError;
 			}
 		} catch (error) {
-			console.error("💥 Error in checkAndFinalizeMatch:", error);
+			console.error("💥 Error in checkAndFinalizeSession:", error);
 			return false;
 		} finally {
 			this.releaseLock(sessionId);
 		}
 	},
 
+	// Alias for backward compatibility
+	async checkAndFinalizeMatch(sessionId: string): Promise<boolean> {
+		return this.checkAndFinalizeSession(sessionId);
+	},
+
 	/**
-	 * Create notifications for match summary
+	 * Create notifications for session summary
 	 */
-	async createSummaryNotifications(sessionId: string): Promise<void> {
+	async createSummaryNotifications(
+		sessionId: string,
+		sessionType: SessionType = "match"
+	): Promise<void> {
 		try {
-			console.log("📧 Creating notifications for session:", sessionId);
+			console.log(
+				`📧 Creating ${sessionType} notifications for session:`,
+				sessionId
+			);
 
 			// Get participants directly
 			const { data: participants, error } = await supabase
@@ -226,12 +243,18 @@ export const matchCompletionService = {
 			);
 
 			// Create notifications for users who don't have one
+			const notificationType =
+				sessionType === "collaboration"
+					? "collaboration_completed"
+					: "match_completed";
+
 			const newNotifications = participants
 				.filter((p) => !existingUserIds.has(p.user_id))
 				.map((p) => ({
 					user_id: p.user_id,
 					session_id: sessionId,
-					type: "match_completed",
+					type: notificationType,
+					session_type: sessionType,
 					created_at: new Date().toISOString(),
 					read: false,
 				}));
@@ -248,7 +271,9 @@ export const matchCompletionService = {
 			if (insertError) {
 				console.error("❌ Error creating notifications:", insertError);
 			} else {
-				console.log(`✅ Created ${newNotifications.length} notifications`);
+				console.log(
+					`✅ Created ${newNotifications.length} ${sessionType} notifications`
+				);
 			}
 		} catch (error) {
 			console.error("💥 Error in createSummaryNotifications:", error);
@@ -256,7 +281,7 @@ export const matchCompletionService = {
 	},
 
 	/**
-	 * Setup global listener for all active sessions
+	 * Setup global listener for all active sessions (both match and collaboration)
 	 */
 	setupGlobalListener(): void {
 		if (this.globalCompletionListener) {
@@ -264,10 +289,10 @@ export const matchCompletionService = {
 			return;
 		}
 
-		console.log("🌐 Starting global match completion listener");
+		console.log("🌐 Starting global session completion listener");
 
 		this.globalCompletionListener = supabase
-			.channel("global-match-completion")
+			.channel("global-session-completion")
 			.on(
 				"postgres_changes",
 				{
@@ -289,7 +314,7 @@ export const matchCompletionService = {
 						// Add delay to let other updates settle
 						await new Promise((resolve) => setTimeout(resolve, 500));
 
-						await this.checkAndFinalizeMatch(participant.session_id);
+						await this.checkAndFinalizeSession(participant.session_id);
 					}
 				}
 			)
@@ -314,7 +339,7 @@ export const matchCompletionService = {
 	 * Setup per-session auto-finalization listener
 	 */
 	setupAutoFinalization(sessionId: string): () => void {
-		const channelName = `match-completion:${sessionId}:${Date.now()}`;
+		const channelName = `session-completion:${sessionId}:${Date.now()}`;
 
 		const channel = supabase
 			.channel(channelName)
@@ -331,16 +356,21 @@ export const matchCompletionService = {
 					const oldParticipant = payload.old as any;
 
 					if (participant.submission_time && !oldParticipant.submission_time) {
-						console.log("📊 Participant submitted, checking if match complete");
+						console.log(
+							"📊 Participant submitted, checking if session complete"
+						);
 
 						await new Promise((resolve) => setTimeout(resolve, 300));
 
-						await this.checkAndFinalizeMatch(sessionId);
+						await this.checkAndFinalizeSession(sessionId);
 					}
 				}
 			)
 			.subscribe((status) => {
-				console.log(`📡 Match completion subscription (${sessionId}):`, status);
+				console.log(
+					`📡 Session completion subscription (${sessionId}):`,
+					status
+				);
 			});
 
 		return () => {
@@ -352,11 +382,20 @@ export const matchCompletionService = {
 	 * Manual finalization trigger (for debugging)
 	 */
 	async forceFinalize(sessionId: string): Promise<boolean> {
-		console.log("⚠️ Force finalizing match:", sessionId);
+		console.log("⚠️ Force finalizing session:", sessionId);
 
 		try {
+			// Get session type
+			const { data: session } = await supabase
+				.from("sessions")
+				.select("type")
+				.eq("id", sessionId)
+				.single();
+
+			const sessionType: SessionType = session?.type || "match";
+
 			await matchService.calculateRankings(sessionId);
-			await matchService.recordMatchHistory(sessionId);
+			await matchService.recordSessionHistory(sessionId);
 
 			await supabase
 				.from("sessions")
@@ -366,7 +405,7 @@ export const matchCompletionService = {
 				})
 				.eq("id", sessionId);
 
-			await this.createSummaryNotifications(sessionId);
+			await this.createSummaryNotifications(sessionId, sessionType);
 
 			console.log("✅ Force finalization complete");
 			return true;

@@ -9,8 +9,8 @@ import SelectLeetCodeProblemStep from "../competition/components/steps/SelectLee
 import ConfigureSessionStep from "./components/steps/ConfigureCollaborationSessionStep";
 import InvitePlayersStep from "../competition/components/steps/InvitePlayersStep";
 
-// Hooks and Services
-import { useCollaborationProblems } from "../../../../../hooks/useCollaborationProblems";
+// Hooks and Services - Use regular problems (same as match mode)
+import { useProblems } from "../../../../../hooks/useProblems";
 import { useUsers } from "../../../../../hooks/useUsers";
 import { sessionService } from "../../../../../services/sessionService";
 import type { Problem, Profile } from "../../../../../types/database";
@@ -23,28 +23,23 @@ type CollaborationModalProps = {
 const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 	const navigate = useNavigate();
 
-	// Hooks for data - use collaboration-specific problems hook
+	// Use regular problems hook (same pool as match mode)
 	const {
 		problems,
 		loading: problemsLoading,
 		error: problemsError,
-	} = useCollaborationProblems();
+	} = useProblems();
 	const { users, loading: usersLoading, searchUsers } = useUsers();
 
 	// State
 	const [step, setStep] = useState(1);
 	const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
 	const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-	const [timeLimit, setTimeLimit] = useState<number>(60); // Default longer for collaboration
+	const [timeLimit, setTimeLimit] = useState<number>(45); // Default longer for collaboration
 	const [playerCount, setPlayerCount] = useState<number>(2);
 	const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
 	const [creating, setCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-
-	// Collaboration-specific options
-	const [isPublic, setIsPublic] = useState(false);
-	const [allowJoinInProgress, setAllowJoinInProgress] = useState(true);
-	const [description, setDescription] = useState("");
 
 	// Handle ESC key
 	useEffect(() => {
@@ -64,13 +59,10 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 			setStep(1);
 			setSelectedProblem(null);
 			setSelectedLanguage("javascript");
-			setTimeLimit(60);
+			setTimeLimit(45);
 			setPlayerCount(2);
 			setSelectedPlayers([]);
 			setError(null);
-			setIsPublic(false);
-			setAllowJoinInProgress(true);
-			setDescription("");
 		}
 	}, [isOpen]);
 
@@ -96,9 +88,6 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 				timeLimit,
 				maxPlayers: playerCount,
 				selectedPlayers: selectedPlayers.map((p) => p.username),
-				isPublic,
-				allowJoinInProgress,
-				description,
 			});
 
 			// Create the collaboration session
@@ -108,9 +97,9 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 				language: selectedLanguage,
 				time_limit: timeLimit,
 				max_players: playerCount,
-				description: description || `Collaboration on ${selectedProblem.title}`,
-				is_public: isPublic,
-				allow_join_in_progress: allowJoinInProgress,
+				description: `Team collaboration on ${selectedProblem.title}`,
+				is_public: false,
+				allow_join_in_progress: false,
 			});
 
 			console.log("Collaboration session created:", session.id);
@@ -144,7 +133,7 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 	};
 
 	const getCurrentStepTitle = () => {
-		if (step === 1) return "Select Project";
+		if (step === 1) return "Select Problem";
 		if (step === 2) return "Configure Session";
 		return "Invite Collaborators";
 	};
@@ -193,12 +182,6 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 							setTimeLimit={setTimeLimit}
 							playerCount={playerCount}
 							setPlayerCount={setPlayerCount}
-							isPublic={isPublic}
-							setIsPublic={setIsPublic}
-							allowJoinInProgress={allowJoinInProgress}
-							setAllowJoinInProgress={setAllowJoinInProgress}
-							description={description}
-							setDescription={setDescription}
 						/>
 					) : (
 						<InvitePlayersStep
