@@ -11,20 +11,47 @@ import {
 	Rocket,
 	Star,
 	TrendingUp,
+	TrendingDown,
 	Lightbulb,
 	Award,
 	Zap,
+	Timer,
+	BarChart3,
+	Trophy,
+	Target,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { sessionService } from "../../services/sessionService";
+import { codeAnalyzerService } from "../../services/codeAnalyzerService";
 import { supabase } from "../../lib/supabase";
 
 interface TeamMember {
+	id: string;
 	name: string;
 	avatar: string | null;
 	passedTests: number;
 	totalTests: number;
-	submissionTime: string;
+	submissionTime: string | null;
+	submissionTimeMs: number | null;
+	ratingBefore: number;
+	ratingChange: number;
+}
+
+interface ComplexityAnalysis {
+	timeComplexity: string;
+	spaceComplexity: string;
+	confidence: "high" | "medium" | "low" | "none";
+}
+
+interface PercentileData {
+	timePercentile: number;
+	complexityPercentile: number;
+	totalComparisons: number;
+	fasterThan: number;
+	betterComplexityThan: number;
+	averageSolveTime: number;
+	fastestSolveTime: number;
+	slowestSolveTime: number;
 }
 
 interface TeamEvaluation {
@@ -33,9 +60,20 @@ interface TeamEvaluation {
 	efficiency: number;
 	codeQuality: number;
 	collaboration: number;
+	solveTimeSeconds: number;
+	complexity: ComplexityAnalysis;
+	percentiles: PercentileData | null;
 	feedback: string[];
 	strengths: string[];
 	improvements: string[];
+	isCorrect: boolean;
+}
+
+interface HistoricalStats {
+	totalCollaborations: number;
+	successRate: number;
+	averageSolveTime: number;
+	averageCorrectness: number;
 }
 
 export default function CollaborationSummaryPage() {
@@ -49,13 +87,27 @@ export default function CollaborationSummaryPage() {
 		null
 	);
 	const [sharedCode, setSharedCode] = useState<string>("");
+	const [currentUserId, setCurrentUserId] = useState<string>("");
+	const [historicalStats, setHistoricalStats] =
+		useState<HistoricalStats | null>(null);
+
+	useEffect(() => {
+		const loadUser = async () => {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (user) {
+				setCurrentUserId(user.id);
+			}
+		};
+		loadUser();
+	}, []);
 
 	useEffect(() => {
 		if (!sessionId) {
 			navigate("/explore");
 			return;
 		}
-
 		loadCollaborationSummary();
 	}, [sessionId]);
 
@@ -87,7 +139,7 @@ export default function CollaborationSummaryPage() {
 
 			setSession(sessionData);
 
-			// Load participants
+			// Load participants with their profiles
 			const { data: participants, error: participantsError } = await supabase
 				.from("session_participants")
 				.select(`*, user:profiles(*)`)
@@ -96,10 +148,26 @@ export default function CollaborationSummaryPage() {
 
 			if (participantsError) throw participantsError;
 
+			// Get rating changes from session_history
+			const { data: historyRecords } = await supabase
+				.from("session_history")
+				.select("user_id, rating_change")
+				.eq("session_id", sessionId)
+				.eq("type", "collaboration");
+
+			const ratingChangeMap = new Map<string, number>();
+			historyRecords?.forEach((record) => {
+				ratingChangeMap.set(record.user_id, record.rating_change || 0);
+			});
+
 			// Map to team members
 			const members: TeamMember[] = (participants || []).map((p: any) => {
 				const testResults = p.test_results || {};
+				const submissionTimeMs = p.submission_time
+					? new Date(p.submission_time).getTime()
+					: null;
 				return {
+					id: p.user_id,
 					name: p.user?.username || "Unknown",
 					avatar: p.user?.avatar_url,
 					passedTests: testResults.passedCount || 0,
@@ -108,22 +176,37 @@ export default function CollaborationSummaryPage() {
 						? new Date(p.submission_time).toLocaleTimeString("en-US", {
 								hour: "2-digit",
 								minute: "2-digit",
+								second: "2-digit",
 						  })
-						: "N/A",
+						: null,
+					submissionTimeMs,
+					ratingBefore:
+						(p.user?.collaboration_rating || 1000) -
+						(ratingChangeMap.get(p.user_id) || 0),
+					ratingChange: ratingChangeMap.get(p.user_id) || 0,
 				};
 			});
 
 			setTeamMembers(members);
 
-			// Get the shared code (use first participant's code snapshot as they all edited the same document)
+			// Get the shared code (use first participant's code snapshot)
 			const codeSnapshot = participants?.[0]?.code_snapshot || "";
 			setSharedCode(codeSnapshot);
 
-			// Calculate team evaluation
-			const evaluation = calculateTeamEvaluation(
+			// Load historical stats for this problem
+			const stats = await loadHistoricalStats(
+				sessionData.problem_id,
+				sessionData.max_players,
+				sessionData.time_limit
+			);
+			setHistoricalStats(stats);
+
+			// Calculate team evaluation with all dynamic data
+			const evaluation = await calculateTeamEvaluation(
 				participants || [],
 				sessionData,
-				codeSnapshot
+				codeSnapshot,
+				stats
 			);
 			setTeamEvaluation(evaluation);
 		} catch (err: any) {
@@ -134,13 +217,126 @@ export default function CollaborationSummaryPage() {
 		}
 	};
 
-	// Calculate team evaluation based on the shared solution
-	const calculateTeamEvaluation = (
+	// Load historical statistics from database
+	const loadHistoricalStats = async (
+		problemId: string,
+		maxPlayers: number,
+		timeLimit: number
+	): Promise<HistoricalStats | null> => {
+		try {
+			// Get all completed collaboration sessions for the same problem with similar settings
+			const { data: historicalSessions, error } = await supabase
+				.from("sessions")
+				.select(
+					`
+					id,
+					started_at,
+					ended_at,
+					max_players,
+					time_limit,
+					session_participants!inner(
+						submission_time,
+						is_correct,
+						test_results
+					)
+				`
+				)
+				.eq("problem_id", problemId)
+				.eq("type", "collaboration")
+				.eq("status", "completed")
+				.neq("id", sessionId); // Exclude current session
+
+			if (error || !historicalSessions) {
+				return null;
+			}
+
+			if (historicalSessions.length === 0) {
+				return {
+					totalCollaborations: 0,
+					successRate: 0,
+					averageSolveTime: 0,
+					averageCorrectness: 0,
+				};
+			}
+
+			let successfulCount = 0;
+			let totalSolveTime = 0;
+			let solveTimeCount = 0;
+			let totalCorrectness = 0;
+
+			for (const session of historicalSessions) {
+				const participants = session.session_participants as any[];
+				if (!participants || participants.length === 0) continue;
+
+				// Check if successful
+				const wasSuccessful = participants.some((p: any) => p.is_correct);
+				if (wasSuccessful) successfulCount++;
+
+				// Calculate solve time
+				if (session.started_at) {
+					const startTime = new Date(session.started_at).getTime();
+					const firstSubmission = participants
+						.filter((p: any) => p.submission_time)
+						.sort(
+							(a: any, b: any) =>
+								new Date(a.submission_time).getTime() -
+								new Date(b.submission_time).getTime()
+						)[0];
+
+					if (firstSubmission) {
+						const solveTime = Math.floor(
+							(new Date(firstSubmission.submission_time).getTime() -
+								startTime) /
+								1000
+						);
+						totalSolveTime += solveTime;
+						solveTimeCount++;
+					}
+				}
+
+				// Calculate correctness (average test pass rate)
+				let sessionCorrectness = 0;
+				let participantCount = 0;
+				for (const p of participants) {
+					const testResults = p.test_results || {};
+					if (testResults.totalCount > 0) {
+						sessionCorrectness +=
+							(testResults.passedCount || 0) / testResults.totalCount;
+						participantCount++;
+					}
+				}
+				if (participantCount > 0) {
+					totalCorrectness += sessionCorrectness / participantCount;
+				}
+			}
+
+			return {
+				totalCollaborations: historicalSessions.length,
+				successRate:
+					historicalSessions.length > 0
+						? (successfulCount / historicalSessions.length) * 100
+						: 0,
+				averageSolveTime:
+					solveTimeCount > 0 ? Math.round(totalSolveTime / solveTimeCount) : 0,
+				averageCorrectness:
+					historicalSessions.length > 0
+						? Math.round((totalCorrectness / historicalSessions.length) * 100)
+						: 0,
+			};
+		} catch (err) {
+			console.error("Error loading historical stats:", err);
+			return null;
+		}
+	};
+
+	// Calculate team evaluation with complexity analysis and percentiles
+	const calculateTeamEvaluation = async (
 		participants: any[],
 		session: any,
-		code: string
-	): TeamEvaluation => {
-		// Calculate correctness based on test results
+		code: string,
+		stats: HistoricalStats | null
+	): Promise<TeamEvaluation> => {
+		// Calculate correctness from actual test results
 		let totalPassed = 0;
 		let totalTests = 0;
 		participants.forEach((p) => {
@@ -149,45 +345,92 @@ export default function CollaborationSummaryPage() {
 			totalTests += results.totalCount || 0;
 		});
 
-		const avgPassRate = totalTests > 0 ? (totalPassed / totalTests) * 100 : 0;
-		const correctness = Math.round(avgPassRate);
+		// For collaboration, check if ANY participant got it correct (they share code)
+		const isCorrect = participants.some((p) => p.is_correct);
 
-		// Estimate efficiency based on code patterns (simplified)
-		const efficiency = estimateEfficiency(code);
+		// Calculate correctness as percentage of tests passed
+		const correctness =
+			totalTests > 0
+				? Math.round(((totalPassed / totalTests) * 100) / participants.length)
+				: 0;
 
-		// Estimate code quality
-		const codeQuality = estimateCodeQuality(code);
+		// Calculate solve time from actual timestamps
+		const startTime = session.started_at
+			? new Date(session.started_at).getTime()
+			: 0;
+		const submissions = participants
+			.filter((p) => p.submission_time)
+			.map((p) => new Date(p.submission_time).getTime());
 
-		// Collaboration score (based on all members submitting)
-		const allSubmitted = participants.every((p) => p.submission_time);
-		const collaboration = allSubmitted ? 90 : 60;
+		const firstSubmissionTime =
+			submissions.length > 0 ? Math.min(...submissions) : Date.now();
+		const solveTimeSeconds =
+			startTime > 0 ? Math.floor((firstSubmissionTime - startTime) / 1000) : 0;
 
-		// Overall score (weighted average)
-		const overallScore = Math.round(
-			correctness * 0.4 +
-				efficiency * 0.2 +
-				codeQuality * 0.2 +
-				collaboration * 0.2
+		// Analyze code complexity using the analyzer service
+		const complexity = codeAnalyzerService.analyzeComplexity(
+			code,
+			session.language
 		);
 
-		// Generate feedback
-		const feedback = generateFeedback(
+		// Calculate percentiles by comparing with historical data
+		const percentiles = await calculatePercentiles(
+			session.problem_id,
+			session.max_players,
+			session.time_limit,
+			solveTimeSeconds,
+			complexity,
+			session.language
+		);
+
+		// Calculate efficiency score from complexity (derived from analyzer)
+		const efficiency = calculateEfficiencyScore(complexity);
+
+		// Calculate code quality from actual code analysis
+		const codeQuality = calculateCodeQualityScore(code, session.language);
+
+		// Calculate collaboration score from actual participation data
+		const collaboration = calculateCollaborationScore(participants, session);
+
+		// Calculate overall score (weighted by actual metrics)
+		const overallScore = calculateOverallScore(
 			correctness,
 			efficiency,
 			codeQuality,
-			collaboration
+			collaboration,
+			isCorrect
 		);
-		const strengths = generateStrengths(
+
+		// Generate dynamic feedback based on actual data
+		const feedback = generateDynamicFeedback(
 			correctness,
 			efficiency,
 			codeQuality,
-			collaboration
+			collaboration,
+			complexity,
+			percentiles,
+			stats,
+			isCorrect
 		);
-		const improvements = generateImprovements(
+
+		const strengths = generateDynamicStrengths(
 			correctness,
 			efficiency,
 			codeQuality,
-			collaboration
+			collaboration,
+			complexity,
+			percentiles,
+			stats
+		);
+
+		const improvements = generateDynamicImprovements(
+			correctness,
+			efficiency,
+			codeQuality,
+			collaboration,
+			complexity,
+			percentiles,
+			stats
 		);
 
 		return {
@@ -196,163 +439,513 @@ export default function CollaborationSummaryPage() {
 			efficiency,
 			codeQuality,
 			collaboration,
+			solveTimeSeconds,
+			complexity,
+			percentiles,
 			feedback,
 			strengths,
 			improvements,
+			isCorrect,
 		};
 	};
 
-	// Estimate code efficiency (simplified heuristic)
-	const estimateEfficiency = (code: string): number => {
-		if (!code) return 50;
+	// Calculate percentiles by comparing with all historical data
+	const calculatePercentiles = async (
+		problemId: string,
+		maxPlayers: number,
+		timeLimit: number,
+		solveTimeSeconds: number,
+		complexity: ComplexityAnalysis,
+		language: string
+	): Promise<PercentileData | null> => {
+		try {
+			// Get all completed collaboration sessions for comparison
+			// Filter by same problem, similar player count (±1), similar time limit (±15 min)
+			const { data: historicalSessions, error } = await supabase
+				.from("sessions")
+				.select(
+					`
+					id,
+					started_at,
+					language,
+					session_participants!inner(
+						submission_time,
+						code_snapshot,
+						is_correct
+					)
+				`
+				)
+				.eq("problem_id", problemId)
+				.eq("type", "collaboration")
+				.eq("status", "completed")
+				.gte("max_players", maxPlayers - 1)
+				.lte("max_players", maxPlayers + 1)
+				.gte("time_limit", timeLimit - 15)
+				.lte("time_limit", timeLimit + 15)
+				.neq("id", sessionId);
 
-		let score = 70;
+			if (error || !historicalSessions || historicalSessions.length < 1) {
+				return null;
+			}
 
-		// Check for nested loops (potential O(n²))
-		const nestedLoopPattern = /for\s*\([^)]*\)[^{}]*\{[^}]*for\s*\([^)]*\)/;
-		if (nestedLoopPattern.test(code)) {
-			score -= 15;
+			// Calculate metrics for each historical session
+			const historicalMetrics: Array<{
+				solveTime: number;
+				complexityScore: number;
+			}> = [];
+
+			for (const session of historicalSessions) {
+				const participants = session.session_participants as any[];
+				if (!participants || participants.length === 0) continue;
+
+				// Only include successful collaborations for fair comparison
+				const wasSuccessful = participants.some((p: any) => p.is_correct);
+				if (!wasSuccessful) continue;
+
+				// Calculate solve time
+				const startTime = session.started_at
+					? new Date(session.started_at).getTime()
+					: 0;
+				const submissions = participants
+					.filter((p: any) => p.submission_time)
+					.map((p: any) => new Date(p.submission_time).getTime());
+
+				if (submissions.length === 0 || startTime === 0) continue;
+
+				const sessionSolveTime = Math.floor(
+					(Math.min(...submissions) - startTime) / 1000
+				);
+
+				// Analyze complexity of historical solution
+				const firstSubmitter = participants.find((p: any) => p.code_snapshot);
+				const historicalComplexity = codeAnalyzerService.analyzeComplexity(
+					firstSubmitter?.code_snapshot || "",
+					session.language || language
+				);
+
+				historicalMetrics.push({
+					solveTime: sessionSolveTime,
+					complexityScore: getComplexityScore(historicalComplexity),
+				});
+			}
+
+			if (historicalMetrics.length < 1) {
+				return null;
+			}
+
+			// Calculate current complexity score
+			const currentComplexityScore = getComplexityScore(complexity);
+
+			// Time percentile (lower solve time is better, so count how many were slower)
+			const fasterThan = historicalMetrics.filter(
+				(m) => m.solveTime > solveTimeSeconds
+			).length;
+			const timePercentile = Math.round(
+				(fasterThan / historicalMetrics.length) * 100
+			);
+
+			// Complexity percentile (higher score is better)
+			const betterComplexityThan = historicalMetrics.filter(
+				(m) => m.complexityScore < currentComplexityScore
+			).length;
+			const complexityPercentile = Math.round(
+				(betterComplexityThan / historicalMetrics.length) * 100
+			);
+
+			// Calculate additional stats
+			const solveTimes = historicalMetrics.map((m) => m.solveTime);
+			const averageSolveTime = Math.round(
+				solveTimes.reduce((a, b) => a + b, 0) / solveTimes.length
+			);
+			const fastestSolveTime = Math.min(...solveTimes);
+			const slowestSolveTime = Math.max(...solveTimes);
+
+			return {
+				timePercentile,
+				complexityPercentile,
+				totalComparisons: historicalMetrics.length,
+				fasterThan,
+				betterComplexityThan,
+				averageSolveTime,
+				fastestSolveTime,
+				slowestSolveTime,
+			};
+		} catch (err) {
+			console.error("Error calculating percentiles:", err);
+			return null;
+		}
+	};
+
+	// Convert complexity to numeric score for comparison
+	const getComplexityScore = (complexity: ComplexityAnalysis): number => {
+		const timeScores: Record<string, number> = {
+			"O(1)": 100,
+			"O(log n)": 90,
+			"O(n)": 80,
+			"O(n log n)": 70,
+			"O(n²)": 50,
+			"O(n³)": 30,
+			"O(2^n)": 20,
+			"O(n!)": 10,
+			"N/A": 0,
+		};
+
+		const spaceScores: Record<string, number> = {
+			"O(1)": 100,
+			"O(log n)": 90,
+			"O(n)": 70,
+			"O(n²)": 40,
+			"O(2^n)": 20,
+			"N/A": 0,
+		};
+
+		const timeScore = timeScores[complexity.timeComplexity] || 50;
+		const spaceScore = spaceScores[complexity.spaceComplexity] || 50;
+
+		// Weight time complexity more heavily (70/30 split)
+		return Math.round(timeScore * 0.7 + spaceScore * 0.3);
+	};
+
+	// Calculate efficiency score from complexity analysis
+	const calculateEfficiencyScore = (complexity: ComplexityAnalysis): number => {
+		if (complexity.confidence === "none") {
+			return 50; // Neutral score when we can't analyze
+		}
+		return getComplexityScore(complexity);
+	};
+
+	// Calculate code quality score from actual code analysis
+	const calculateCodeQualityScore = (
+		code: string,
+		language: string
+	): number => {
+		if (!code || code.trim().length === 0) return 0;
+
+		let score = 50; // Start neutral
+		const lines = code.split("\n");
+		const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+
+		// Check for comments (language-aware)
+		const hasComments =
+			language === "python"
+				? code.includes("#") || code.includes('"""') || code.includes("'''")
+				: code.includes("//") || code.includes("/*");
+		if (hasComments) score += 15;
+
+		// Check for meaningful variable names (average length > 3 chars)
+		const varPattern =
+			language === "python"
+				? /(?:^|\s)(\w+)\s*=/gm
+				: /(?:let|const|var)\s+(\w+)/g;
+		const matches = [...code.matchAll(varPattern)];
+		if (matches.length > 0) {
+			const avgLength =
+				matches.reduce((sum, m) => sum + (m[1]?.length || 0), 0) /
+				matches.length;
+			if (avgLength > 5) score += 15;
+			else if (avgLength > 3) score += 8;
 		}
 
-		// Check for using Map/Set (often more efficient)
-		if (code.includes("new Map") || code.includes("new Set")) {
-			score += 10;
-		}
+		// Check for proper indentation
+		const hasIndentation = nonEmptyLines.some(
+			(l) => l.startsWith("  ") || l.startsWith("\t")
+		);
+		if (hasIndentation) score += 10;
 
-		// Check for sorting (O(n log n))
-		if (code.includes(".sort(")) {
-			score += 5;
-		}
+		// Check for reasonable line count (not too short, not too long)
+		if (nonEmptyLines.length >= 5 && nonEmptyLines.length <= 100) score += 5;
 
-		// Check for early returns (good practice)
-		if (code.includes("return") && code.split("return").length > 2) {
-			score += 5;
-		}
+		// Check for function/method definitions
+		const hasFunctions =
+			language === "python"
+				? /def\s+\w+\s*\(/.test(code)
+				: /function\s+\w+\s*\(|const\s+\w+\s*=\s*(?:async\s*)?\(/.test(code);
+		if (hasFunctions) score += 5;
 
 		return Math.min(100, Math.max(0, score));
 	};
 
-	// Estimate code quality (simplified heuristic)
-	const estimateCodeQuality = (code: string): number => {
-		if (!code) return 50;
+	// Calculate collaboration score from actual participation metrics
+	const calculateCollaborationScore = (
+		participants: any[],
+		session: any
+	): number => {
+		if (participants.length === 0) return 0;
 
-		let score = 70;
+		let score = 0;
+		const totalParticipants = participants.length;
 
-		// Check for comments
-		if (code.includes("//") || code.includes("/*")) {
-			score += 10;
+		// Factor 1: Submission rate (did everyone submit?)
+		const submittedCount = participants.filter((p) => p.submission_time).length;
+		const submissionRate = submittedCount / totalParticipants;
+		score += submissionRate * 40; // Up to 40 points
+
+		// Factor 2: Submission timing spread (did they work together or one person carry?)
+		const submissions = participants
+			.filter((p) => p.submission_time)
+			.map((p) => new Date(p.submission_time).getTime());
+
+		if (submissions.length >= 2) {
+			const minTime = Math.min(...submissions);
+			const maxTime = Math.max(...submissions);
+			const spreadMs = maxTime - minTime;
+			const spreadMinutes = spreadMs / (1000 * 60);
+
+			// Tight spread (< 5 min) suggests good coordination
+			if (spreadMinutes < 5) score += 30;
+			else if (spreadMinutes < 15) score += 20;
+			else if (spreadMinutes < 30) score += 10;
+		} else if (submissions.length === 1) {
+			score += 15; // Single person, some credit
 		}
 
-		// Check for meaningful variable names (heuristic: longer names)
-		const variablePattern = /(?:let|const|var)\s+(\w+)/g;
-		const matches = code.match(variablePattern) || [];
-		const avgNameLength =
-			matches.reduce((sum, m) => sum + m.split(/\s+/)[1]?.length || 0, 0) /
-			Math.max(matches.length, 1);
-		if (avgNameLength > 5) {
-			score += 10;
-		}
+		// Factor 3: Team size utilization
+		const expectedPlayers = session.max_players || 2;
+		const utilizationRate = totalParticipants / expectedPlayers;
+		score += utilizationRate * 30; // Up to 30 points
 
-		// Check for consistent formatting (rough check)
-		if (code.includes("\n  ") || code.includes("\n\t")) {
-			score += 5;
-		}
-
-		// Penalize very long functions
-		if (code.length > 2000) {
-			score -= 10;
-		}
-
-		return Math.min(100, Math.max(0, score));
+		return Math.min(100, Math.max(0, Math.round(score)));
 	};
 
-	// Generate feedback messages
-	const generateFeedback = (
+	// Calculate overall score with dynamic weighting
+	const calculateOverallScore = (
 		correctness: number,
 		efficiency: number,
 		codeQuality: number,
-		collaboration: number
+		collaboration: number,
+		isCorrect: boolean
+	): number => {
+		// If the solution is correct, weight correctness higher
+		// If incorrect, weight it lower to show room for improvement
+		const correctnessWeight = isCorrect ? 0.4 : 0.5;
+		const efficiencyWeight = isCorrect ? 0.25 : 0.15;
+		const qualityWeight = 0.15;
+		const collaborationWeight = isCorrect ? 0.2 : 0.2;
+
+		return Math.round(
+			correctness * correctnessWeight +
+				efficiency * efficiencyWeight +
+				codeQuality * qualityWeight +
+				collaboration * collaborationWeight
+		);
+	};
+
+	// Generate dynamic feedback based on all metrics
+	const generateDynamicFeedback = (
+		correctness: number,
+		efficiency: number,
+		codeQuality: number,
+		collaboration: number,
+		complexity: ComplexityAnalysis,
+		percentiles: PercentileData | null,
+		stats: HistoricalStats | null,
+		isCorrect: boolean
 	): string[] => {
 		const feedback: string[] = [];
 
-		if (correctness >= 90) {
+		// Correctness feedback
+		if (isCorrect) {
+			feedback.push("Your team successfully solved the problem!");
+		} else if (correctness >= 80) {
 			feedback.push(
-				"Excellent work! Your team's solution passes all test cases."
+				`Almost there! Your solution passes ${correctness}% of test cases.`
 			);
-		} else if (correctness >= 70) {
-			feedback.push("Good progress! Most test cases are passing.");
+		} else if (correctness >= 50) {
+			feedback.push(
+				`Your solution passes ${correctness}% of test cases. Review the failing cases for edge conditions.`
+			);
 		} else {
 			feedback.push(
-				"Your solution needs some refinement to pass more test cases."
+				`Your solution needs work - only ${correctness}% of tests pass. Consider a different approach.`
 			);
 		}
 
-		if (collaboration >= 80) {
+		// Complexity feedback
+		if (complexity.confidence !== "none") {
 			feedback.push(
-				"Great teamwork - all members contributed to the solution."
+				`Your solution has ${complexity.timeComplexity} time complexity and ${complexity.spaceComplexity} space complexity.`
+			);
+		}
+
+		// Percentile feedback
+		if (percentiles) {
+			if (percentiles.timePercentile >= 75) {
+				feedback.push(
+					`Excellent speed! Your team solved this faster than ${percentiles.timePercentile}% of other teams.`
+				);
+			} else if (percentiles.timePercentile >= 50) {
+				feedback.push(
+					`Good pace - you were faster than ${percentiles.timePercentile}% of teams.`
+				);
+			}
+		}
+
+		// Historical comparison
+		if (stats && stats.totalCollaborations > 0) {
+			feedback.push(
+				`This problem has been attempted by ${
+					stats.totalCollaborations
+				} other teams with a ${stats.successRate.toFixed(0)}% success rate.`
 			);
 		}
 
 		return feedback;
 	};
 
-	// Generate strengths
-	const generateStrengths = (
+	// Generate dynamic strengths based on metrics
+	const generateDynamicStrengths = (
 		correctness: number,
 		efficiency: number,
 		codeQuality: number,
-		collaboration: number
+		collaboration: number,
+		complexity: ComplexityAnalysis,
+		percentiles: PercentileData | null,
+		stats: HistoricalStats | null
 	): string[] => {
 		const strengths: string[] = [];
 
-		if (correctness >= 80) strengths.push("High test pass rate");
-		if (efficiency >= 80) strengths.push("Efficient algorithm approach");
-		if (codeQuality >= 80) strengths.push("Clean, readable code");
-		if (collaboration >= 80) strengths.push("Effective team collaboration");
+		if (correctness >= 80) {
+			strengths.push(`High test pass rate (${correctness}%)`);
+		}
+
+		if (efficiency >= 80) {
+			strengths.push(`Efficient ${complexity.timeComplexity} algorithm`);
+		} else if (efficiency >= 60 && complexity.timeComplexity !== "N/A") {
+			strengths.push(`Reasonable ${complexity.timeComplexity} time complexity`);
+		}
+
+		if (codeQuality >= 80) {
+			strengths.push("Well-structured, readable code");
+		} else if (codeQuality >= 65) {
+			strengths.push("Code has good formatting and structure");
+		}
+
+		if (collaboration >= 80) {
+			strengths.push("Excellent team coordination");
+		} else if (collaboration >= 60) {
+			strengths.push("Good team participation");
+		}
+
+		if (percentiles) {
+			if (percentiles.timePercentile >= 75) {
+				strengths.push(
+					`Top ${100 - percentiles.timePercentile}% in solve time`
+				);
+			}
+			if (percentiles.complexityPercentile >= 75) {
+				strengths.push(
+					`Top ${
+						100 - percentiles.complexityPercentile
+					}% in algorithm efficiency`
+				);
+			}
+		}
+
+		if (stats && stats.successRate > 0 && correctness === 100) {
+			if (stats.successRate < 50) {
+				strengths.push("Solved a challenging problem (< 50% success rate)");
+			}
+		}
 
 		if (strengths.length === 0) {
-			strengths.push("Completed the challenge together");
+			strengths.push("Team completed the challenge together");
 		}
 
 		return strengths;
 	};
 
-	// Generate improvement suggestions
-	const generateImprovements = (
+	// Generate dynamic improvements based on metrics
+	const generateDynamicImprovements = (
 		correctness: number,
 		efficiency: number,
 		codeQuality: number,
-		collaboration: number
+		collaboration: number,
+		complexity: ComplexityAnalysis,
+		percentiles: PercentileData | null,
+		stats: HistoricalStats | null
 	): string[] => {
 		const improvements: string[] = [];
 
-		if (correctness < 80)
-			improvements.push("Review edge cases in your solution");
-		if (efficiency < 70)
-			improvements.push("Consider optimizing time complexity");
-		if (codeQuality < 70)
+		if (correctness < 100) {
+			if (correctness < 50) {
+				improvements.push("Consider a different algorithmic approach");
+			} else {
+				improvements.push("Review edge cases and boundary conditions");
+			}
+		}
+
+		if (
+			complexity.timeComplexity === "O(n²)" ||
+			complexity.timeComplexity === "O(2^n)"
+		) {
+			improvements.push(
+				`Consider optimizing from ${complexity.timeComplexity} to O(n log n) or O(n)`
+			);
+		}
+
+		if (complexity.spaceComplexity === "O(n)" && efficiency < 70) {
+			improvements.push("Try to reduce space complexity if possible");
+		}
+
+		if (codeQuality < 60) {
 			improvements.push("Add comments to explain complex logic");
-		if (collaboration < 80)
-			improvements.push("Ensure all team members contribute");
+			improvements.push("Use more descriptive variable names");
+		} else if (codeQuality < 80) {
+			improvements.push("Consider adding inline comments for clarity");
+		}
+
+		if (collaboration < 60) {
+			improvements.push("Ensure all team members actively participate");
+		}
+
+		if (percentiles) {
+			if (percentiles.timePercentile < 50 && percentiles.averageSolveTime > 0) {
+				const avgMins = Math.floor(percentiles.averageSolveTime / 60);
+				improvements.push(
+					`Average solve time is ${avgMins}m - practice to improve speed`
+				);
+			}
+		}
 
 		if (improvements.length === 0) {
-			improvements.push("Keep practicing to tackle harder problems!");
+			improvements.push("Keep practicing with harder problems!");
 		}
 
 		return improvements;
 	};
 
-	// Score color helper
+	// Format time display
+	const formatTime = (seconds: number): string => {
+		if (seconds < 60) return `${seconds}s`;
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		if (mins >= 60) {
+			const hours = Math.floor(mins / 60);
+			const remainingMins = mins % 60;
+			return `${hours}h ${remainingMins}m`;
+		}
+		return `${mins}m ${secs}s`;
+	};
+
+	// Score color helpers
 	const getScoreColor = (score: number): string => {
 		if (score >= 80) return "text-green-400";
 		if (score >= 60) return "text-yellow-400";
+		if (score >= 40) return "text-orange-400";
 		return "text-red-400";
 	};
 
 	const getScoreBgColor = (score: number): string => {
 		if (score >= 80) return "bg-green-500/20";
 		if (score >= 60) return "bg-yellow-500/20";
+		if (score >= 40) return "bg-orange-500/20";
 		return "bg-red-500/20";
+	};
+
+	const getRatingChangeColor = (change: number): string => {
+		if (change > 0) return "text-green-400";
+		if (change < 0) return "text-red-400";
+		return "text-gray-400";
 	};
 
 	if (loading) {
@@ -432,29 +1025,29 @@ export default function CollaborationSummaryPage() {
 
 			{/* Main Content */}
 			<main className="container mx-auto py-6 px-4 max-w-5xl">
-				{/* Problem Info Banner */}
-				<div className="bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-6 mb-8 text-center">
+				{/* Result Banner */}
+				<div
+					className={`rounded-lg p-6 mb-8 text-center border ${
+						teamEvaluation.isCorrect
+							? "bg-gradient-to-r from-green-500/20 to-green-600/20 border-green-500/30"
+							: "bg-gradient-to-r from-red-500/20 to-red-600/20 border-red-500/30"
+					}`}
+				>
 					<div className="flex justify-center mb-4">
-						<div
-							className={`w-20 h-20 rounded-full flex items-center justify-center ${getScoreBgColor(
-								teamEvaluation.overallScore
-							)}`}
-						>
-							<span
-								className={`text-3xl font-bold ${getScoreColor(
-									teamEvaluation.overallScore
-								)}`}
-							>
-								{teamEvaluation.overallScore}
-							</span>
-						</div>
+						{teamEvaluation.isCorrect ? (
+							<div className="w-20 h-20 rounded-full flex items-center justify-center bg-green-500/20">
+								<Trophy className="text-green-400" size={40} />
+							</div>
+						) : (
+							<div className="w-20 h-20 rounded-full flex items-center justify-center bg-red-500/20">
+								<XCircle className="text-red-400" size={40} />
+							</div>
+						)}
 					</div>
 					<h2 className="text-2xl font-bold mb-2">
-						{teamEvaluation.overallScore >= 80
-							? "Excellent Teamwork! 🎉"
-							: teamEvaluation.overallScore >= 60
-							? "Good Effort! 👍"
-							: "Keep Practicing! 💪"}
+						{teamEvaluation.isCorrect
+							? "Problem Solved! 🎉"
+							: "Not Quite There 💪"}
 					</h2>
 					<p className="text-lg text-gray-300">
 						Problem:{" "}
@@ -463,9 +1056,119 @@ export default function CollaborationSummaryPage() {
 						</span>{" "}
 						({session.problem?.difficulty})
 					</p>
+					<p className="text-sm text-gray-400 mt-2">
+						Solved in {formatTime(teamEvaluation.solveTimeSeconds)} •{" "}
+						{teamMembers.length} players • {session.time_limit} min limit
+					</p>
+					{historicalStats && historicalStats.totalCollaborations > 0 && (
+						<p className="text-xs text-gray-500 mt-1">
+							{historicalStats.totalCollaborations} previous attempts •{" "}
+							{historicalStats.successRate.toFixed(0)}% success rate
+						</p>
+					)}
 				</div>
 
-				{/* Team Members */}
+				{/* Complexity & Time Analysis */}
+				<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
+					<h3 className="text-xl font-semibold mb-4 flex items-center">
+						<BarChart3 className="mr-2 text-purple-500" size={20} />
+						Solution Analysis
+					</h3>
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
+							<Clock className="mx-auto mb-2 text-blue-400" size={24} />
+							<div className="text-2xl font-bold text-blue-400">
+								{teamEvaluation.complexity.timeComplexity}
+							</div>
+							<div className="text-sm text-gray-400">Time Complexity</div>
+							{teamEvaluation.complexity.confidence !== "none" && (
+								<div className="text-xs text-gray-500 mt-1">
+									Confidence: {teamEvaluation.complexity.confidence}
+								</div>
+							)}
+						</div>
+
+						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
+							<Zap className="mx-auto mb-2 text-yellow-400" size={24} />
+							<div className="text-2xl font-bold text-yellow-400">
+								{teamEvaluation.complexity.spaceComplexity}
+							</div>
+							<div className="text-sm text-gray-400">Space Complexity</div>
+						</div>
+
+						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
+							<Timer className="mx-auto mb-2 text-green-400" size={24} />
+							<div className="text-2xl font-bold text-green-400">
+								{formatTime(teamEvaluation.solveTimeSeconds)}
+							</div>
+							<div className="text-sm text-gray-400">Solve Time</div>
+							{teamEvaluation.percentiles && (
+								<div className="text-xs text-gray-500 mt-1">
+									Avg: {formatTime(teamEvaluation.percentiles.averageSolveTime)}
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* Percentile Comparison */}
+				{teamEvaluation.percentiles && (
+					<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
+						<h3 className="text-xl font-semibold mb-4 flex items-center">
+							<Target className="mr-2 text-purple-500" size={20} />
+							Compared to Other Teams
+						</h3>
+						<p className="text-sm text-gray-400 mb-4">
+							Based on {teamEvaluation.percentiles.totalComparisons} successful
+							collaborations with similar settings
+						</p>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div className="p-4 bg-[#1f1f1f] rounded-lg">
+								<div className="flex items-center justify-between mb-2">
+									<span className="text-gray-400">Runtime</span>
+									<span className="text-green-400 font-bold">
+										Beats {teamEvaluation.percentiles.timePercentile}%
+									</span>
+								</div>
+								<div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+									<div
+										className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-1000"
+										style={{
+											width: `${teamEvaluation.percentiles.timePercentile}%`,
+										}}
+									/>
+								</div>
+								<p className="text-xs text-gray-500 mt-2">
+									Faster than {teamEvaluation.percentiles.fasterThan} of{" "}
+									{teamEvaluation.percentiles.totalComparisons} teams
+								</p>
+							</div>
+
+							<div className="p-4 bg-[#1f1f1f] rounded-lg">
+								<div className="flex items-center justify-between mb-2">
+									<span className="text-gray-400">Complexity</span>
+									<span className="text-blue-400 font-bold">
+										Beats {teamEvaluation.percentiles.complexityPercentile}%
+									</span>
+								</div>
+								<div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+									<div
+										className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-1000"
+										style={{
+											width: `${teamEvaluation.percentiles.complexityPercentile}%`,
+										}}
+									/>
+								</div>
+								<p className="text-xs text-gray-500 mt-2">
+									Better than {teamEvaluation.percentiles.betterComplexityThan}{" "}
+									of {teamEvaluation.percentiles.totalComparisons} teams
+								</p>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* Team Members with Rating Changes */}
 				<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
 					<h3 className="text-xl font-semibold mb-4 flex items-center">
 						<Users className="mr-2 text-purple-500" size={20} />
@@ -475,21 +1178,47 @@ export default function CollaborationSummaryPage() {
 						{teamMembers.map((member, index) => (
 							<div
 								key={index}
-								className="flex items-center space-x-4 p-4 bg-[#1f1f1f] rounded-lg"
+								className={`flex items-center space-x-4 p-4 bg-[#1f1f1f] rounded-lg ${
+									member.id === currentUserId ? "ring-2 ring-purple-500/50" : ""
+								}`}
 							>
 								<div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-lg">
 									{member.name.charAt(0).toUpperCase()}
 								</div>
 								<div className="flex-1">
-									<p className="font-medium text-white">{member.name}</p>
+									<div className="flex items-center justify-between">
+										<p className="font-medium text-white">
+											{member.name}
+											{member.id === currentUserId && (
+												<span className="text-purple-400 text-xs ml-2">
+													(You)
+												</span>
+											)}
+										</p>
+										<div
+											className={`flex items-center ${getRatingChangeColor(
+												member.ratingChange
+											)}`}
+										>
+											{member.ratingChange > 0 ? (
+												<TrendingUp size={14} className="mr-1" />
+											) : member.ratingChange < 0 ? (
+												<TrendingDown size={14} className="mr-1" />
+											) : null}
+											<span className="font-bold">
+												{member.ratingChange > 0 ? "+" : ""}
+												{member.ratingChange}
+											</span>
+										</div>
+									</div>
 									<div className="flex items-center space-x-3 text-sm text-gray-400">
 										<span className="flex items-center">
 											<CheckCircle size={14} className="mr-1 text-green-400" />
 											{member.passedTests}/{member.totalTests} tests
 										</span>
 										<span className="flex items-center">
-											<Clock size={14} className="mr-1" />
-											{member.submissionTime}
+											<Award size={14} className="mr-1" />
+											{member.ratingBefore + member.ratingChange} ELO
 										</span>
 									</div>
 								</div>
@@ -505,7 +1234,6 @@ export default function CollaborationSummaryPage() {
 						Team Evaluation
 					</h3>
 					<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-						{/* Correctness */}
 						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
 							<CheckCircle
 								className={`mx-auto mb-2 ${getScoreColor(
@@ -523,7 +1251,6 @@ export default function CollaborationSummaryPage() {
 							<div className="text-sm text-gray-400">Correctness</div>
 						</div>
 
-						{/* Efficiency */}
 						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
 							<Zap
 								className={`mx-auto mb-2 ${getScoreColor(
@@ -541,7 +1268,6 @@ export default function CollaborationSummaryPage() {
 							<div className="text-sm text-gray-400">Efficiency</div>
 						</div>
 
-						{/* Code Quality */}
 						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
 							<Code
 								className={`mx-auto mb-2 ${getScoreColor(
@@ -559,7 +1285,6 @@ export default function CollaborationSummaryPage() {
 							<div className="text-sm text-gray-400">Code Quality</div>
 						</div>
 
-						{/* Collaboration */}
 						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
 							<Users
 								className={`mx-auto mb-2 ${getScoreColor(
@@ -581,7 +1306,6 @@ export default function CollaborationSummaryPage() {
 
 				{/* Feedback Section */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-					{/* Strengths */}
 					<div className="bg-[#2c2c2c] rounded-lg p-6 border border-gray-700">
 						<h3 className="text-lg font-semibold mb-4 flex items-center text-green-400">
 							<Star className="mr-2" size={20} />
@@ -600,7 +1324,6 @@ export default function CollaborationSummaryPage() {
 						</ul>
 					</div>
 
-					{/* Areas for Improvement */}
 					<div className="bg-[#2c2c2c] rounded-lg p-6 border border-gray-700">
 						<h3 className="text-lg font-semibold mb-4 flex items-center text-yellow-400">
 							<TrendingUp className="mr-2" size={20} />
@@ -644,8 +1367,8 @@ export default function CollaborationSummaryPage() {
 						</h3>
 						<div className="bg-[#1e1e1e] rounded-lg p-4 overflow-x-auto">
 							<pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-								{sharedCode.slice(0, 1500)}
-								{sharedCode.length > 1500 && (
+								{sharedCode.slice(0, 2000)}
+								{sharedCode.length > 2000 && (
 									<span className="text-gray-500">... (truncated)</span>
 								)}
 							</pre>

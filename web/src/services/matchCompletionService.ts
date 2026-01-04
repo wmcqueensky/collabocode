@@ -5,7 +5,7 @@ import type { SessionType } from "../types/database";
 /**
  * Session Completion Service
  * Handles the finalization of both match and collaboration sessions
- * including rankings, history, and notifications
+ * including rankings, history, ratings, and notifications
  */
 export const matchCompletionService = {
 	// Global listener reference
@@ -16,6 +16,9 @@ export const matchCompletionService = {
 
 	// Lock timeout in milliseconds (30 seconds)
 	LOCK_TIMEOUT: 30000,
+
+	// ELO K-factor for rating calculations
+	ELO_K_FACTOR: 32,
 
 	/**
 	 * Acquire a processing lock for a session
@@ -61,7 +64,7 @@ export const matchCompletionService = {
 			// Step 1: Get session status directly from DB
 			const { data: session, error: sessionError } = await supabase
 				.from("sessions")
-				.select("id, status, problem_id, type")
+				.select("id, status, problem_id, type, max_players, time_limit")
 				.eq("id", sessionId)
 				.single();
 
@@ -111,38 +114,43 @@ export const matchCompletionService = {
 			console.log("🔒 Database lock acquired via 'completing' status");
 
 			try {
-				// Step 4: Calculate rankings
-				console.log("📊 Calculating rankings...");
-				await matchService.calculateRankings(sessionId);
-				console.log("✅ Rankings calculated");
-
-				// Step 5: Small delay to ensure DB commits
-				await new Promise((resolve) => setTimeout(resolve, 200));
-
-				// Step 6: Verify rankings are set
-				const { data: rankedParticipants } = await supabase
-					.from("session_participants")
-					.select("id, user_id, ranking, is_correct")
-					.eq("session_id", sessionId)
-					.eq("status", "joined");
-
-				console.log("📊 Verified rankings:", rankedParticipants);
-
-				const unrankedCount =
-					rankedParticipants?.filter(
-						(p) => p.ranking === null || p.ranking === undefined
-					).length || 0;
-
-				if (unrankedCount > 0) {
-					console.error(`❌ ${unrankedCount} participants still unranked`);
+				if (sessionType === "collaboration") {
+					// Handle collaboration-specific finalization
+					await this.finalizeCollaborationSession(
+						sessionId,
+						session.problem_id
+					);
+				} else {
+					// Handle match finalization (existing logic)
+					console.log("📊 Calculating rankings...");
 					await matchService.calculateRankings(sessionId);
-					await new Promise((resolve) => setTimeout(resolve, 200));
-				}
+					console.log("✅ Rankings calculated");
 
-				// Step 7: Record session history
-				console.log("📝 Recording session history...");
-				await matchService.recordSessionHistory(sessionId);
-				console.log("✅ Session history recorded");
+					await new Promise((resolve) => setTimeout(resolve, 200));
+
+					const { data: rankedParticipants } = await supabase
+						.from("session_participants")
+						.select("id, user_id, ranking, is_correct")
+						.eq("session_id", sessionId)
+						.eq("status", "joined");
+
+					console.log("📊 Verified rankings:", rankedParticipants);
+
+					const unrankedCount =
+						rankedParticipants?.filter(
+							(p) => p.ranking === null || p.ranking === undefined
+						).length || 0;
+
+					if (unrankedCount > 0) {
+						console.error(`❌ ${unrankedCount} participants still unranked`);
+						await matchService.calculateRankings(sessionId);
+						await new Promise((resolve) => setTimeout(resolve, 200));
+					}
+
+					console.log("📝 Recording session history...");
+					await matchService.recordSessionHistory(sessionId);
+					console.log("✅ Session history recorded");
+				}
 
 				// Step 8: Update session status to completed
 				const { error: completeError } = await supabase
@@ -192,6 +200,193 @@ export const matchCompletionService = {
 		} finally {
 			this.releaseLock(sessionId);
 		}
+	},
+
+	/**
+	 * Finalize a collaboration session - handles team-based ELO and history
+	 */
+	async finalizeCollaborationSession(
+		sessionId: string,
+		problemId: string
+	): Promise<void> {
+		console.log("🤝 Finalizing collaboration session...");
+
+		// Get all participants
+		const { data: participants, error: participantsError } = await supabase
+			.from("session_participants")
+			.select(
+				`
+				id,
+				user_id,
+				is_correct,
+				submission_time,
+				test_results,
+				user:profiles(collaboration_rating, collaboration_solved)
+			`
+			)
+			.eq("session_id", sessionId)
+			.eq("status", "joined");
+
+		if (participantsError || !participants) {
+			throw new Error("Failed to get participants for collaboration");
+		}
+
+		// Determine if the team succeeded (any participant got it correct - they share code)
+		const teamSuccess = participants.some((p) => p.is_correct);
+		console.log(`📊 Team success: ${teamSuccess}`);
+
+		// Calculate ELO changes for all team members
+		const ratingChanges = await this.calculateCollaborationRatingChanges(
+			participants,
+			teamSuccess,
+			problemId
+		);
+
+		// Update each participant's rating and create history records
+		for (const participant of participants) {
+			const ratingChange = ratingChanges.get(participant.user_id) || 0;
+			const userProfile = participant.user as any;
+			const currentRating = userProfile?.collaboration_rating || 1000;
+			const currentSolved = userProfile?.collaboration_solved || 0;
+			const newRating = Math.max(0, currentRating + ratingChange);
+
+			// Update profile rating and solved count
+			const updateData: any = {
+				collaboration_rating: newRating,
+			};
+
+			if (teamSuccess) {
+				updateData.collaboration_solved = currentSolved + 1;
+			}
+
+			const { error: updateError } = await supabase
+				.from("profiles")
+				.update(updateData)
+				.eq("id", participant.user_id);
+
+			if (updateError) {
+				console.error(
+					`❌ Error updating rating for ${participant.user_id}:`,
+					updateError
+				);
+			}
+
+			// Create session history record
+			const { error: historyError } = await supabase
+				.from("session_history")
+				.insert({
+					user_id: participant.user_id,
+					session_id: sessionId,
+					problem_id: problemId,
+					result: teamSuccess ? "win" : "loss",
+					ranking: 1, // No ranking in collaboration - all team members equal
+					rating_change: ratingChange,
+					completed: true,
+					type: "collaboration",
+				});
+
+			if (historyError) {
+				console.error(
+					`❌ Error creating history for ${participant.user_id}:`,
+					historyError
+				);
+			}
+
+			console.log(
+				`✅ Updated ${participant.user_id}: ${currentRating} → ${newRating} (${
+					ratingChange > 0 ? "+" : ""
+				}${ratingChange})`
+			);
+		}
+
+		console.log("✅ Collaboration session finalized");
+	},
+
+	/**
+	 * Calculate ELO rating changes for collaboration participants
+	 */
+	async calculateCollaborationRatingChanges(
+		participants: any[],
+		teamSuccess: boolean,
+		problemId: string
+	): Promise<Map<string, number>> {
+		const ratingChanges = new Map<string, number>();
+
+		// Get problem difficulty for ELO calculation
+		const { data: problem } = await supabase
+			.from("problems")
+			.select("difficulty")
+			.eq("id", problemId)
+			.single();
+
+		const difficulty = problem?.difficulty || "Medium";
+
+		// Difficulty multiplier - harder problems give more/lose more
+		const difficultyMultiplier: Record<string, number> = {
+			Easy: 0.8,
+			Medium: 1.0,
+			Hard: 1.3,
+		};
+
+		const multiplier = difficultyMultiplier[difficulty] || 1.0;
+
+		// Get historical success rate for this problem to calculate expected score
+		const { data: historicalSessions } = await supabase
+			.from("sessions")
+			.select(
+				`
+				id,
+				session_participants!inner(is_correct)
+			`
+			)
+			.eq("problem_id", problemId)
+			.eq("type", "collaboration")
+			.eq("status", "completed")
+			.limit(100);
+
+		let expectedWinRate = 0.5; // Default 50% if no historical data
+
+		if (historicalSessions && historicalSessions.length > 0) {
+			const successfulSessions = historicalSessions.filter((s) =>
+				(s.session_participants as any[]).some((p) => p.is_correct)
+			).length;
+			expectedWinRate = successfulSessions / historicalSessions.length;
+			// Clamp to reasonable range
+			expectedWinRate = Math.max(0.1, Math.min(0.9, expectedWinRate));
+		}
+
+		console.log(
+			`📊 Problem difficulty: ${difficulty}, Expected win rate: ${(
+				expectedWinRate * 100
+			).toFixed(1)}%`
+		);
+
+		// Calculate rating change for each participant
+		for (const participant of participants) {
+			const currentRating =
+				(participant.user as any)?.collaboration_rating || 1000;
+
+			// ELO formula: change = K * multiplier * (actual - expected)
+			const actual = teamSuccess ? 1 : 0;
+			const expected = expectedWinRate;
+
+			// Adjust K-factor based on rating (lower K for higher rated players for stability)
+			let kFactor = this.ELO_K_FACTOR;
+			if (currentRating > 1500) kFactor = 24;
+			if (currentRating > 2000) kFactor = 16;
+			if (currentRating < 800) kFactor = 40; // Higher volatility for new players
+
+			const ratingChange = Math.round(
+				kFactor * multiplier * (actual - expected)
+			);
+
+			// Cap the maximum loss to prevent huge drops
+			const cappedChange = Math.max(-50, Math.min(50, ratingChange));
+
+			ratingChanges.set(participant.user_id, cappedChange);
+		}
+
+		return ratingChanges;
 	},
 
 	// Alias for backward compatibility
@@ -385,17 +580,21 @@ export const matchCompletionService = {
 		console.log("⚠️ Force finalizing session:", sessionId);
 
 		try {
-			// Get session type
+			// Get session type and problem
 			const { data: session } = await supabase
 				.from("sessions")
-				.select("type")
+				.select("type, problem_id")
 				.eq("id", sessionId)
 				.single();
 
 			const sessionType: SessionType = session?.type || "match";
 
-			await matchService.calculateRankings(sessionId);
-			await matchService.recordSessionHistory(sessionId);
+			if (sessionType === "collaboration") {
+				await this.finalizeCollaborationSession(sessionId, session?.problem_id);
+			} else {
+				await matchService.calculateRankings(sessionId);
+				await matchService.recordSessionHistory(sessionId);
+			}
 
 			await supabase
 				.from("sessions")
