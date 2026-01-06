@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
 	ChevronDown,
 	Menu,
@@ -8,6 +8,7 @@ import {
 	Trophy,
 	Target,
 	Users,
+	Loader2,
 } from "lucide-react";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { supabase } from "../../../../lib/supabase";
@@ -15,6 +16,7 @@ import { userService } from "../../../../services/userService";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
 import NotificationCenter from "../../../../components/notifications/NotificationCenter";
+import StreakModal from "./modals/streak/StreakModal";
 
 interface UserStats {
 	matchRating: number;
@@ -27,10 +29,13 @@ interface UserStats {
 const Navbar = () => {
 	const { user, signOut, loading } = useAuth();
 	const location = useLocation();
+	const navigate = useNavigate();
 	const [showMobileMenu, setShowMobileMenu] = useState(false);
 	const [showUserMenu, setShowUserMenu] = useState(false);
 	const [showLoginModal, setShowLoginModal] = useState(false);
 	const [showRegisterModal, setShowRegisterModal] = useState(false);
+	const [showStreakModal, setShowStreakModal] = useState(false);
+	const [statsLoading, setStatsLoading] = useState(true);
 	const [userStats, setUserStats] = useState<UserStats>({
 		matchRating: 1500,
 		collaborationRating: 1500,
@@ -42,6 +47,7 @@ const Navbar = () => {
 	useEffect(() => {
 		if (user) {
 			fetchUserStats();
+			checkDailyLogin();
 
 			// Subscribe to profile changes
 			const channel = supabase
@@ -68,12 +74,37 @@ const Navbar = () => {
 
 	const fetchUserStats = async () => {
 		if (!user) return;
+		setStatsLoading(true);
 
 		try {
 			const stats = await userService.getUserStats(user.id);
 			setUserStats(stats);
 		} catch (error) {
 			console.error("Error fetching user stats:", error);
+		} finally {
+			setStatsLoading(false);
+		}
+	};
+
+	const checkDailyLogin = async () => {
+		if (!user) return;
+
+		try {
+			const lastLoginKey = `lastLogin_${user.id}`;
+			const lastLogin = localStorage.getItem(lastLoginKey);
+			const today = new Date().toDateString();
+
+			if (lastLogin !== today) {
+				// Update streak and show modal
+				const streakResult = await userService.updateDailyStreak(user.id);
+				if (streakResult) {
+					setUserStats((prev) => ({ ...prev, streak: streakResult.streak }));
+					setShowStreakModal(true);
+				}
+				localStorage.setItem(lastLoginKey, today);
+			}
+		} catch (error) {
+			console.error("Error checking daily login:", error);
 		}
 	};
 
@@ -96,6 +127,10 @@ const Navbar = () => {
 		setShowLoginModal(true);
 	};
 
+	const handleLogoClick = () => {
+		navigate("/explore");
+	};
+
 	const username =
 		user?.user_metadata?.username || user?.email?.split("@")[0] || "User";
 	const avatarLetter = username[0]?.toUpperCase() || "U";
@@ -105,34 +140,50 @@ const Navbar = () => {
 	// Calculate total solved
 	const totalSolved = userStats.matchSolved + userStats.collaborationSolved;
 
+	// Animated loading spinner component
+	const StatSkeleton = () => (
+		<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 animate-pulse">
+			<Loader2 size={16} className="text-gray-500 animate-spin" />
+			<div className="h-4 w-8 bg-gray-700 rounded"></div>
+		</div>
+	);
+
+	// Logo icon - uses violet-400 (#a78bfa) which harmonizes with both teal and the dark theme
+	const LogoIcon = () => (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			className="w-7 h-7 text-[#a78bfa] mr-1"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			strokeWidth={2}
+		>
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				d="M9.75 6.75L5.25 12l4.5 5.25M14.25 6.75L18.75 12l-4.5 5.25"
+			/>
+		</svg>
+	);
+
 	if (loading) {
 		return (
 			<header className="bg-[#1a1a1a] border-b border-gray-800 py-3 sticky top-0 z-50">
 				<div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
 					<div className="flex items-center space-x-2">
-						<Link to="/" className="flex items-center space-x-2">
+						<button
+							onClick={handleLogoClick}
+							className="flex items-center space-x-2 cursor-pointer"
+						>
 							<h1 className="text-2xl font-bold flex items-center">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									className="w-7 h-7 text-white mr-1"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									strokeWidth={2}
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										d="M9.75 6.75L5.25 12l4.5 5.25M14.25 6.75L18.75 12l-4.5 5.25"
-									/>
-								</svg>
+								<LogoIcon />
 								<span className="text-white">Collabo</span>
 								<span className="text-[#5bc6ca]">Code</span>
 							</h1>
-						</Link>
+						</button>
 					</div>
 					<div className="flex items-center space-x-4">
-						<div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse"></div>
+						<Loader2 size={24} className="text-gray-500 animate-spin" />
 					</div>
 				</div>
 			</header>
@@ -143,26 +194,16 @@ const Navbar = () => {
 		<header className="bg-[#1a1a1a] border-b border-gray-800 py-3 sticky top-0 z-50">
 			<div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
 				<div className="flex items-center space-x-2">
-					<Link to="/" className="flex items-center space-x-2">
+					<button
+						onClick={handleLogoClick}
+						className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity"
+					>
 						<h1 className="text-2xl font-bold flex items-center">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								className="w-7 h-7 text-white mr-1"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								strokeWidth={2}
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									d="M9.75 6.75L5.25 12l4.5 5.25M14.25 6.75L18.75 12l-4.5 5.25"
-								/>
-							</svg>
+							<LogoIcon />
 							<span className="text-white">Collabo</span>
 							<span className="text-[#5bc6ca]">Code</span>
 						</h1>
-					</Link>
+					</button>
 				</div>
 
 				<div className="flex items-center space-x-4">
@@ -171,49 +212,65 @@ const Navbar = () => {
 							{/* User Stats - Desktop */}
 							<div className="hidden lg:flex items-center space-x-3 mr-2">
 								{/* Streak */}
-								<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700">
-									<Flame size={16} className="text-orange-500" />
-									<span className="text-sm font-semibold text-white">
-										{userStats.streak}
-									</span>
-									<span className="text-xs text-gray-400">streak</span>
-								</div>
+								{statsLoading ? (
+									<StatSkeleton />
+								) : (
+									<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-orange-500/50">
+										<Flame size={16} className="text-orange-500" />
+										<span className="text-sm font-semibold text-white">
+											{userStats.streak}
+										</span>
+										<span className="text-xs text-gray-400">streak</span>
+									</div>
+								)}
 
-								{/* Match Rating */}
-								<div
-									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
-									title="Match Rating"
-								>
-									<Trophy size={16} className="text-yellow-500" />
-									<span className="text-sm font-semibold text-white">
-										{userStats.matchRating}
-									</span>
-									<span className="text-xs text-gray-400">ELO</span>
-								</div>
+								{/* Match Rating - Changed from ELO to Match */}
+								{statsLoading ? (
+									<StatSkeleton />
+								) : (
+									<div
+										className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-yellow-500/50"
+										title="Match Rating"
+									>
+										<Trophy size={16} className="text-yellow-500" />
+										<span className="text-sm font-semibold text-white">
+											{userStats.matchRating}
+										</span>
+										<span className="text-xs text-gray-400">Match</span>
+									</div>
+								)}
 
-								{/* Collaboration Rating */}
-								<div
-									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
-									title="Collaboration Rating"
-								>
-									<Users size={16} className="text-purple-500" />
-									<span className="text-sm font-semibold text-white">
-										{userStats.collaborationRating}
-									</span>
-									<span className="text-xs text-gray-400">Collab</span>
-								</div>
+								{/* Collaboration Rating - uses harmonious violet */}
+								{statsLoading ? (
+									<StatSkeleton />
+								) : (
+									<div
+										className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-[#8b5cf6]/50"
+										title="Collaboration Rating"
+									>
+										<Users size={16} className="text-[#a78bfa]" />
+										<span className="text-sm font-semibold text-white">
+											{userStats.collaborationRating}
+										</span>
+										<span className="text-xs text-gray-400">Collab</span>
+									</div>
+								)}
 
 								{/* Problems Solved */}
-								<div
-									className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700"
-									title={`Match: ${userStats.matchSolved} | Collab: ${userStats.collaborationSolved}`}
-								>
-									<Target size={16} className="text-[#5bc6ca]" />
-									<span className="text-sm font-semibold text-white">
-										{totalSolved}
-									</span>
-									<span className="text-xs text-gray-400">solved</span>
-								</div>
+								{statsLoading ? (
+									<StatSkeleton />
+								) : (
+									<div
+										className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-[#5bc6ca]/50"
+										title={`Match: ${userStats.matchSolved} | Collab: ${userStats.collaborationSolved}`}
+									>
+										<Target size={16} className="text-[#5bc6ca]" />
+										<span className="text-sm font-semibold text-white">
+											{totalSolved}
+										</span>
+										<span className="text-xs text-gray-400">solved</span>
+									</div>
+								)}
 							</div>
 
 							<NotificationCenter />
@@ -243,34 +300,61 @@ const Navbar = () => {
 
 											{/* Stats - Mobile View */}
 											<div className="grid grid-cols-2 gap-2 mt-3 lg:hidden">
-												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
-													<Flame size={14} className="text-orange-500" />
-													<span className="text-xs font-semibold text-white">
-														{userStats.streak}
-													</span>
-													<span className="text-xs text-gray-500">streak</span>
-												</div>
-												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
-													<Trophy size={14} className="text-yellow-500" />
-													<span className="text-xs font-semibold text-white">
-														{userStats.matchRating}
-													</span>
-													<span className="text-xs text-gray-500">Match</span>
-												</div>
-												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
-													<Users size={14} className="text-purple-500" />
-													<span className="text-xs font-semibold text-white">
-														{userStats.collaborationRating}
-													</span>
-													<span className="text-xs text-gray-500">Collab</span>
-												</div>
-												<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
-													<Target size={14} className="text-[#5bc6ca]" />
-													<span className="text-xs font-semibold text-white">
-														{totalSolved}
-													</span>
-													<span className="text-xs text-gray-500">solved</span>
-												</div>
+												{statsLoading ? (
+													<>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded animate-pulse">
+															<div className="h-3 w-12 bg-gray-700 rounded"></div>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded animate-pulse">
+															<div className="h-3 w-12 bg-gray-700 rounded"></div>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded animate-pulse">
+															<div className="h-3 w-12 bg-gray-700 rounded"></div>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded animate-pulse">
+															<div className="h-3 w-12 bg-gray-700 rounded"></div>
+														</div>
+													</>
+												) : (
+													<>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+															<Flame size={14} className="text-orange-500" />
+															<span className="text-xs font-semibold text-white">
+																{userStats.streak}
+															</span>
+															<span className="text-xs text-gray-500">
+																streak
+															</span>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+															<Trophy size={14} className="text-yellow-500" />
+															<span className="text-xs font-semibold text-white">
+																{userStats.matchRating}
+															</span>
+															<span className="text-xs text-gray-500">
+																Match
+															</span>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+															<Users size={14} className="text-[#a78bfa]" />
+															<span className="text-xs font-semibold text-white">
+																{userStats.collaborationRating}
+															</span>
+															<span className="text-xs text-gray-500">
+																Collab
+															</span>
+														</div>
+														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+															<Target size={14} className="text-[#5bc6ca]" />
+															<span className="text-xs font-semibold text-white">
+																{totalSolved}
+															</span>
+															<span className="text-xs text-gray-500">
+																solved
+															</span>
+														</div>
+													</>
+												)}
 											</div>
 										</div>
 
@@ -409,6 +493,12 @@ const Navbar = () => {
 				isOpen={showRegisterModal}
 				onClose={() => setShowRegisterModal(false)}
 				onSwitchModal={switchToLogin}
+			/>
+
+			<StreakModal
+				isOpen={showStreakModal}
+				onClose={() => setShowStreakModal(false)}
+				streak={userStats.streak}
 			/>
 		</header>
 	);

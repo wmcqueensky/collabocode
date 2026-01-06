@@ -2,18 +2,21 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Rocket, Clock, Users } from "lucide-react";
 
-// Shared Components from competition modal
-import ModalHeader from "../competition/components/layout/ModalHeader";
-import ModalFooter from "../competition/components/layout/ModalFooter";
-import SelectLeetCodeProblemStep from "../competition/components/steps/SelectLeetCodeProblemStep";
-import ConfigureSessionStep from "./components/steps/ConfigureCollaborationSessionStep";
-import InvitePlayersStep from "../competition/components/steps/InvitePlayersStep";
+// Collaboration-specific components (violet theme)
+import ModalHeader from "./components/layout/ModalHeader";
+import ModalFooter from "./components/layout/ModalFooter";
+import SelectProblemStep from "./components/steps/SelectProblemStep";
+import ConfigureSessionStep from "./components/steps/ConfigureSessionStep";
+import InvitePlayersStep from "./components/steps/InvitePlayersStep";
 
-// Hooks and Services - Use regular problems (same as match mode)
+// Hooks and Services
 import { useProblems } from "../../../../../hooks/useProblems";
 import { useUsers } from "../../../../../hooks/useUsers";
 import { sessionService } from "../../../../../services/sessionService";
 import type { Problem, Profile } from "../../../../../types/database";
+
+// Violet accent for icons
+const VIOLET_ICON = "text-[#a78bfa]";
 
 type CollaborationModalProps = {
 	isOpen: boolean;
@@ -23,7 +26,7 @@ type CollaborationModalProps = {
 const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 	const navigate = useNavigate();
 
-	// Use regular problems hook (same pool as match mode)
+	// Hooks
 	const {
 		problems,
 		loading: problemsLoading,
@@ -35,7 +38,7 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 	const [step, setStep] = useState(1);
 	const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
 	const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-	const [timeLimit, setTimeLimit] = useState<number>(45); // Default longer for collaboration
+	const [timeLimit, setTimeLimit] = useState<number>(45);
 	const [playerCount, setPlayerCount] = useState<number>(2);
 	const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>([]);
 	const [creating, setCreating] = useState(false);
@@ -81,15 +84,6 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 			setCreating(true);
 			setError(null);
 
-			console.log("Creating collaboration session with:", {
-				type: "collaboration",
-				problem: selectedProblem.title,
-				language: selectedLanguage,
-				timeLimit,
-				maxPlayers: playerCount,
-				selectedPlayers: selectedPlayers.map((p) => p.username),
-			});
-
 			// Create the collaboration session
 			const session = await sessionService.createSession({
 				type: "collaboration",
@@ -102,17 +96,13 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 				allow_join_in_progress: false,
 			});
 
-			console.log("Collaboration session created:", session.id);
-
 			// Invite selected players
 			if (selectedPlayers.length > 0) {
 				const playerIds = selectedPlayers.map((p) => p.id);
-				console.log("Inviting collaborators:", playerIds);
 				await sessionService.invitePlayers(session.id, playerIds);
-				console.log("Collaborators invited successfully");
 			}
 
-			// Navigate to the collaboration page (with waiting lobby)
+			// Navigate to the collaboration page
 			navigate(`/collaboration/${session.id}`);
 			onClose();
 		} catch (err: any) {
@@ -127,9 +117,10 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 
 	const getCurrentStepIcon = () => {
 		if (step === 1)
-			return <Rocket size={20} className="text-purple-500 mr-2" />;
-		if (step === 2) return <Clock size={20} className="text-purple-500 mr-2" />;
-		return <Users size={20} className="text-purple-500 mr-2" />;
+			return <Rocket size={20} className={`${VIOLET_ICON} mr-2`} />;
+		if (step === 2)
+			return <Clock size={20} className={`${VIOLET_ICON} mr-2`} />;
+		return <Users size={20} className={`${VIOLET_ICON} mr-2`} />;
 	};
 
 	const getCurrentStepTitle = () => {
@@ -149,8 +140,8 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-2 sm:p-4">
-			<div className="relative bg-[#1f1f1f] rounded-xl shadow-xl w-full max-w-4xl flex flex-col border border-gray-700 h-full max-h-[95vh] sm:max-h-[90vh] md:max-h-[85vh]">
-				{/* Modal Header */}
+			<div className="relative bg-[#1f1f1f] rounded-xl shadow-xl w-full max-w-4xl flex flex-col border border-[#3d3654] h-full max-h-[95vh] sm:max-h-[90vh] md:max-h-[85vh]">
+				{/* Modal Header - Violet themed */}
 				<ModalHeader
 					icon={getCurrentStepIcon()}
 					title={getCurrentStepTitle()}
@@ -165,9 +156,9 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 				)}
 
 				{/* Modal Content */}
-				<div className="flex-1 overflow-y-auto px-3 py-2 sm:px-4">
+				<div className="flex-1 overflow-y-auto">
 					{step === 1 ? (
-						<SelectLeetCodeProblemStep
+						<SelectProblemStep
 							selectedProblem={selectedProblem}
 							setSelectedProblem={setSelectedProblem}
 							problems={problems}
@@ -198,8 +189,8 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 					)}
 				</div>
 
-				{/* Modal Footer */}
-				<div className="sticky bottom-0 z-10 w-full bg-[#1f1f1f]">
+				{/* Modal Footer - Violet themed */}
+				<div className="sticky bottom-0 z-10 w-full bg-[#1f1f1f] rounded-b-xl">
 					<ModalFooter
 						step={step}
 						totalSteps={3}

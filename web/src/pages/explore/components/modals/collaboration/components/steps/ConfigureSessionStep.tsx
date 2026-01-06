@@ -1,7 +1,7 @@
 import { Clock, Code, Users, Rocket } from "lucide-react";
 import type { Problem } from "../../../../../../../types/database";
 
-type ConfigureCollaborationSessionStepProps = {
+type ConfigureSessionStepProps = {
 	selectedProblem: Problem | null;
 	selectedLanguage: string;
 	setSelectedLanguage: (language: string) => void;
@@ -18,13 +18,22 @@ const LANGUAGES = [
 ];
 
 const TIME_OPTIONS = [
-	{ value: 30, label: "30 minutes" },
-	{ value: 45, label: "45 minutes" },
-	{ value: 60, label: "60 minutes" },
-	{ value: 90, label: "90 minutes" },
+	{ value: 30, label: "30 min" },
+	{ value: 45, label: "45 min" },
+	{ value: 60, label: "60 min" },
+	{ value: 90, label: "90 min" },
 ];
 
-const ConfigureCollaborationSessionStep = ({
+// Violet accent colors
+const ACCENT = {
+	bg: "bg-[#8b5cf6]",
+	bgLight: "bg-[#8b5cf6]/20",
+	bgLighter: "bg-[#8b5cf6]/10",
+	text: "text-[#a78bfa]",
+	border: "border-[#8b5cf6]/30",
+};
+
+const ConfigureSessionStep = ({
 	selectedProblem,
 	selectedLanguage,
 	setSelectedLanguage,
@@ -32,29 +41,38 @@ const ConfigureCollaborationSessionStep = ({
 	setTimeLimit,
 	playerCount,
 	setPlayerCount,
-}: ConfigureCollaborationSessionStepProps) => {
+}: ConfigureSessionStepProps) => {
+	const getDifficultyColor = (difficulty: string) => {
+		switch (difficulty?.toLowerCase()) {
+			case "easy":
+				return "bg-green-500/20 text-green-400";
+			case "medium":
+				return "bg-yellow-500/20 text-yellow-400";
+			case "hard":
+				return "bg-red-500/20 text-red-400";
+			default:
+				return "bg-gray-500/20 text-gray-400";
+		}
+	};
+
 	return (
-		<div className="space-y-4 sm:space-y-6 py-2">
+		<div className="p-4 sm:p-6 space-y-5">
 			{/* Selected Problem Summary */}
 			{selectedProblem && (
-				<div className="bg-[#2a2a2a] rounded-lg p-3 sm:p-4 border border-purple-500/30">
+				<div className={`bg-[#2a2a2a] rounded-lg p-4 border ${ACCENT.border}`}>
 					<div className="flex items-start space-x-3">
-						<div className="p-2 bg-purple-500/20 rounded-lg">
-							<Rocket className="text-purple-400" size={20} />
+						<div className={`p-2 ${ACCENT.bgLight} rounded-lg`}>
+							<Rocket className={ACCENT.text} size={20} />
 						</div>
 						<div className="flex-1 min-w-0">
-							<h3 className="font-medium text-white text-sm sm:text-base truncate">
+							<h3 className="font-medium text-white truncate">
 								{selectedProblem.title}
 							</h3>
 							<div className="flex flex-wrap items-center gap-2 mt-1">
 								<span
-									className={`px-2 py-0.5 rounded-full text-xs ${
-										selectedProblem.difficulty === "Easy"
-											? "bg-green-500/20 text-green-400"
-											: selectedProblem.difficulty === "Medium"
-											? "bg-yellow-500/20 text-yellow-400"
-											: "bg-red-500/20 text-red-400"
-									}`}
+									className={`px-2 py-0.5 rounded-full text-xs ${getDifficultyColor(
+										selectedProblem.difficulty
+									)}`}
 								>
 									{selectedProblem.difficulty}
 								</span>
@@ -75,7 +93,7 @@ const ConfigureCollaborationSessionStep = ({
 			{/* Language Selection */}
 			<div>
 				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
-					<Code size={16} className="mr-2 text-purple-400" />
+					<Code size={16} className={`mr-2 ${ACCENT.text}`} />
 					Programming Language
 				</label>
 				<div className="grid grid-cols-3 gap-2">
@@ -83,9 +101,9 @@ const ConfigureCollaborationSessionStep = ({
 						<button
 							key={lang.value}
 							onClick={() => setSelectedLanguage(lang.value)}
-							className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
 								selectedLanguage === lang.value
-									? "bg-purple-500 text-white"
+									? `${ACCENT.bg} text-white`
 									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
 							}`}
 						>
@@ -98,17 +116,17 @@ const ConfigureCollaborationSessionStep = ({
 			{/* Time Limit */}
 			<div>
 				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
-					<Clock size={16} className="mr-2 text-purple-400" />
+					<Clock size={16} className={`mr-2 ${ACCENT.text}`} />
 					Time Limit
 				</label>
-				<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+				<div className="grid grid-cols-4 gap-2">
 					{TIME_OPTIONS.map((option) => (
 						<button
 							key={option.value}
 							onClick={() => setTimeLimit(option.value)}
-							className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
 								timeLimit === option.value
-									? "bg-purple-500 text-white"
+									? `${ACCENT.bg} text-white`
 									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
 							}`}
 						>
@@ -121,7 +139,7 @@ const ConfigureCollaborationSessionStep = ({
 			{/* Player Count */}
 			<div>
 				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
-					<Users size={16} className="mr-2 text-purple-400" />
+					<Users size={16} className={`mr-2 ${ACCENT.text}`} />
 					Team Size
 				</label>
 				<div className="grid grid-cols-3 gap-2">
@@ -131,7 +149,7 @@ const ConfigureCollaborationSessionStep = ({
 							onClick={() => setPlayerCount(count)}
 							className={`px-3 py-3 rounded-lg text-sm font-medium transition-all ${
 								playerCount === count
-									? "bg-purple-500 text-white"
+									? `${ACCENT.bg} text-white`
 									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
 							}`}
 						>
@@ -147,8 +165,10 @@ const ConfigureCollaborationSessionStep = ({
 			</div>
 
 			{/* Info Box */}
-			<div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-				<h4 className="text-purple-400 font-medium text-sm mb-2">
+			<div
+				className={`${ACCENT.bgLighter} border ${ACCENT.border} rounded-lg p-4`}
+			>
+				<h4 className={`${ACCENT.text} font-medium text-sm mb-2`}>
 					🤝 Real-Time Collaboration
 				</h4>
 				<ul className="text-gray-400 text-xs space-y-1">
@@ -156,11 +176,10 @@ const ConfigureCollaborationSessionStep = ({
 					<li>• See your teammates' cursors as they type</li>
 					<li>• Use chat to discuss your approach and strategy</li>
 					<li>• Work together to solve the problem before time runs out</li>
-					<li>• All members must submit when the solution is ready</li>
 				</ul>
 			</div>
 		</div>
 	);
 };
 
-export default ConfigureCollaborationSessionStep;
+export default ConfigureSessionStep;

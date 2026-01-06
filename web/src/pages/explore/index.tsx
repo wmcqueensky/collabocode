@@ -16,30 +16,30 @@ export default function ExplorePage() {
 			<div className="max-w-6xl mx-auto px-4 py-12">
 				<PageTitle
 					title="Choose Your Coding Mode"
-					description="Select how you want to code together. Each mode is optimized for different collaboration and rivalisation styles and goals."
+					description="Select how you want to code together. Each mode is optimized for different collaboration and competition styles and goals."
 				/>
 
 				{/* Mode Selection Cards */}
 				<section className="grid md:grid-cols-2 gap-8 mb-24">
-					{/* LeetCode Mode Card */}
+					{/* Challenge Mode Card - Teal theme */}
 					<ExploreCard
 						title="Challenge Mode"
 						description="Solve coding challenges together with a timer. Perfect for interview preparation, algorithm practice, and educational sessions."
 						headerGradient="bg-gradient-to-r from-[#5bc6ca] to-[#48aeb3]"
 						headerContent={
 							<>
-								{/* Left curly bracket - closer to vertical center */}
+								{/* Left curly bracket */}
 								<div className="absolute top-1/4 left-6 text-5xl opacity-20 text-black">
 									{"{"}
 								</div>
 
-								{/* Right curly bracket - closer to vertical center */}
+								{/* Right curly bracket */}
 								<div className="absolute bottom-1/4 right-6 text-5xl opacity-20 text-black">
 									{"}"}
 								</div>
 
 								{/* Centered loop statement */}
-								<div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] md:w-[500px] text-3xl font-mono opacity-30 text-black text-center leading-snug ">
+								<div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] md:w-[500px] text-3xl font-mono opacity-30 text-black text-center leading-snug">
 									for (let i = 0; i {"<"} 10; i++)
 								</div>
 							</>
@@ -55,13 +55,14 @@ export default function ExplorePage() {
 						buttonText="Start Session"
 						buttonOnClick={() => setIsCompetitionModalOpen(true)}
 						tagText="Interview Prep & Problem Solving"
+						variant="teal"
 					/>
 
-					{/* Codebase Mode Card */}
+					{/* Codebase Mode Card - Violet theme (harmonizes with teal) */}
 					<ExploreCard
 						title="Codebase Mode"
 						description="Debug, review, and enhance codebases as a team. Perfect for solving tough problems together."
-						headerGradient="bg-gradient-to-r from-[#3a3a3a] to-[#2c2c2c]"
+						headerGradient="bg-gradient-to-r from-[#5b21b6] to-[#7c3aed]"
 						headerContent={
 							<>
 								<div className="absolute top-[20%] left-[15%] text-xl sm:text-2xl opacity-30 text-white font-mono whitespace-nowrap max-w-full">
@@ -78,7 +79,7 @@ export default function ExplorePage() {
 								</div>
 							</>
 						}
-						icon={<Rocket size={20} className="text-[#5bc6ca]" />}
+						icon={<Rocket size={20} className="text-[#a78bfa]" />}
 						features={[
 							{
 								icon: (
@@ -162,6 +163,7 @@ export default function ExplorePage() {
 						buttonText="Start Collaboration"
 						buttonOnClick={() => setIsCollaborationModalOpen(true)}
 						tagText="Project Development & Collaboration"
+						variant="violet"
 					/>
 				</section>
 			</div>

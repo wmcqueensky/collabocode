@@ -228,6 +228,78 @@ export const userService = {
 		return data || [];
 	},
 
+	// Update daily streak - called when user logs in for the day
+	async updateDailyStreak(
+		userId: string
+	): Promise<{ streak: number; isNewDay: boolean } | null> {
+		try {
+			const { data: profile, error: fetchError } = await supabase
+				.from("profiles")
+				.select("streak, last_login_date")
+				.eq("id", userId)
+				.single();
+
+			if (fetchError) {
+				console.error("Error fetching profile for streak:", fetchError);
+				return null;
+			}
+
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const todayStr = today.toISOString().split("T")[0];
+
+			const lastLoginDate = profile?.last_login_date
+				? new Date(profile.last_login_date)
+				: null;
+			if (lastLoginDate) {
+				lastLoginDate.setHours(0, 0, 0, 0);
+			}
+
+			const lastLoginStr = lastLoginDate
+				? lastLoginDate.toISOString().split("T")[0]
+				: null;
+
+			// If already logged in today, return current streak
+			if (lastLoginStr === todayStr) {
+				return { streak: profile?.streak || 0, isNewDay: false };
+			}
+
+			let newStreak = 1;
+
+			if (lastLoginDate) {
+				const yesterday = new Date(today);
+				yesterday.setDate(yesterday.getDate() - 1);
+				const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+				// If last login was yesterday, increment streak
+				if (lastLoginStr === yesterdayStr) {
+					newStreak = (profile?.streak || 0) + 1;
+				}
+				// Otherwise, streak resets to 1
+			}
+
+			// Update profile with new streak and last login date
+			const { error: updateError } = await supabase
+				.from("profiles")
+				.update({
+					streak: newStreak,
+					last_login_date: todayStr,
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", userId);
+
+			if (updateError) {
+				console.error("Error updating streak:", updateError);
+				return null;
+			}
+
+			return { streak: newStreak, isNewDay: true };
+		} catch (error) {
+			console.error("Error in updateDailyStreak:", error);
+			return null;
+		}
+	},
+
 	// Get user statistics for both modes
 	async getUserStats(userId?: string): Promise<{
 		matchRating: number;
@@ -254,7 +326,7 @@ export const userService = {
 		const { data: profile, error } = await supabase
 			.from("profiles")
 			.select(
-				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved"
+				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved, streak, last_login_date"
 			)
 			.eq("id", targetUserId)
 			.single();
@@ -270,36 +342,25 @@ export const userService = {
 			};
 		}
 
-		// Calculate streak from session history
-		let streak = 0;
-		try {
-			const { data: historyData } = await supabase
-				.from("session_history")
-				.select("created_at, completed")
-				.eq("user_id", targetUserId)
-				.eq("completed", true)
-				.order("created_at", { ascending: false })
-				.limit(30);
+		// Verify streak is still valid (hasn't been broken)
+		let currentStreak = profile?.streak || 0;
+		if (profile?.last_login_date) {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
 
-			// Fallback to match_history if session_history doesn't exist
-			const matches = historyData || [];
-			if (matches.length === 0) {
-				const { data: matchHistoryData } = await supabase
-					.from("match_history")
-					.select("created_at, completed")
-					.eq("user_id", targetUserId)
-					.eq("completed", true)
-					.order("created_at", { ascending: false })
-					.limit(30);
+			const lastLogin = new Date(profile.last_login_date);
+			lastLogin.setHours(0, 0, 0, 0);
 
-				if (matchHistoryData) {
-					matches.push(...matchHistoryData);
-				}
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+
+			// If last login wasn't today or yesterday, streak is broken
+			if (
+				lastLogin.getTime() !== today.getTime() &&
+				lastLogin.getTime() !== yesterday.getTime()
+			) {
+				currentStreak = 0;
 			}
-
-			streak = this.calculateStreak(matches);
-		} catch (e) {
-			console.error("Error calculating streak:", e);
 		}
 
 		return {
@@ -307,11 +368,11 @@ export const userService = {
 			collaborationRating: profile?.collaboration_rating ?? 1500,
 			matchSolved: profile?.match_solved ?? profile?.problems_solved ?? 0,
 			collaborationSolved: profile?.collaboration_solved ?? 0,
-			streak,
+			streak: currentStreak,
 		};
 	},
 
-	// Helper function to calculate streak
+	// Legacy helper function to calculate streak from history (deprecated)
 	calculateStreak(
 		matches: Array<{ created_at: string; completed: boolean }>
 	): number {
