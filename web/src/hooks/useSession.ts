@@ -1,58 +1,86 @@
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../lib/supabase";
 import { sessionService } from "../services/sessionService";
 import type { Session, SessionParticipant } from "../types/database";
-import { supabase } from "../lib/supabase";
 
-export const useSession = (sessionId: string | null) => {
+interface UseSessionReturn {
+	session: Session | null;
+	participants: SessionParticipant[];
+	loading: boolean;
+	error: string | null;
+	// NEW: Separate function for updating test progress (no submission)
+	updateTestProgress: (code: string, testResults: any) => Promise<void>;
+	// Submit code (final submission with submission_time)
+	submitCode: (code: string, testResults: any) => Promise<void>;
+	updateStatus: (
+		status: "waiting" | "in_progress" | "completing" | "completed" | "cancelled"
+	) => Promise<void>;
+	refetch: () => Promise<void>;
+}
+
+export function useSession(sessionId: string | null): UseSessionReturn {
 	const [session, setSession] = useState<Session | null>(null);
 	const [participants, setParticipants] = useState<SessionParticipant[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-	// Memoized load functions
-	const loadSession = useCallback(async () => {
-		if (!sessionId) return;
-
-		try {
-			const data = await sessionService.getSessionById(sessionId);
-			console.log("Session loaded:", data);
-			setSession(data);
-			setError(null);
-		} catch (err: any) {
-			console.error("Error loading session:", err);
-			setError(err.message);
-		} finally {
-			setLoading(false);
-		}
-	}, [sessionId]);
-
-	const loadParticipants = useCallback(async () => {
-		if (!sessionId) return;
-
-		try {
-			const data = await sessionService.getSessionParticipants(sessionId);
-			console.log("Participants loaded:", data);
-			setParticipants(data);
-		} catch (err: any) {
-			console.error("Error loading participants:", err);
-		}
-	}, [sessionId]);
-
+	// Get current user
 	useEffect(() => {
+		const getUser = async () => {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (user) {
+				setCurrentUserId(user.id);
+			}
+		};
+		getUser();
+	}, []);
+
+	// Fetch session data
+	const fetchSession = useCallback(async () => {
 		if (!sessionId) {
 			setLoading(false);
 			return;
 		}
 
-		// Initial load
-		loadSession();
-		loadParticipants();
+		try {
+			setLoading(true);
+			setError(null);
 
-		// Subscribe to real-time updates for participants
-		console.log("Setting up subscriptions for session:", sessionId);
+			// Get session
+			const sessionData = await sessionService.getSessionById(sessionId);
+			if (!sessionData) {
+				setError("Session not found");
+				return;
+			}
+			setSession(sessionData);
 
-		const participantsChannel = supabase
-			.channel(`session-participants-${sessionId}-${Date.now()}`)
+			// Get participants
+			const participantsData = await sessionService.getSessionParticipants(
+				sessionId
+			);
+			setParticipants(participantsData);
+		} catch (err: any) {
+			console.error("Error fetching session:", err);
+			setError(err.message || "Failed to load session");
+		} finally {
+			setLoading(false);
+		}
+	}, [sessionId]);
+
+	// Initial fetch
+	useEffect(() => {
+		fetchSession();
+	}, [fetchSession]);
+
+	// Real-time subscription
+	useEffect(() => {
+		if (!sessionId) return;
+
+		const channel = supabase
+			.channel(`session-hook:${sessionId}`)
 			.on(
 				"postgres_changes",
 				{
@@ -61,19 +89,14 @@ export const useSession = (sessionId: string | null) => {
 					table: "session_participants",
 					filter: `session_id=eq.${sessionId}`,
 				},
-				async (payload) => {
-					console.log("🔔 Participant real-time update:", payload);
-					// Reload participants data immediately
-					await loadParticipants();
+				async () => {
+					// Refetch participants on any change
+					const participantsData = await sessionService.getSessionParticipants(
+						sessionId
+					);
+					setParticipants(participantsData);
 				}
 			)
-			.subscribe((status) => {
-				console.log("📡 Participants subscription status:", status);
-			});
-
-		// Subscribe to real-time updates for session
-		const sessionChannel = supabase
-			.channel(`session-status-${sessionId}-${Date.now()}`)
 			.on(
 				"postgres_changes",
 				{
@@ -82,58 +105,84 @@ export const useSession = (sessionId: string | null) => {
 					table: "sessions",
 					filter: `id=eq.${sessionId}`,
 				},
-				async (payload) => {
-					console.log("🔔 Session real-time update:", payload);
-					// Reload session data immediately
-					await loadSession();
+				async () => {
+					// Refetch session on update
+					const sessionData = await sessionService.getSessionById(sessionId);
+					if (sessionData) {
+						setSession(sessionData);
+					}
 				}
 			)
-			.subscribe((status) => {
-				console.log("📡 Session subscription status:", status);
-			});
+			.subscribe();
 
 		return () => {
-			console.log("Cleaning up subscriptions for session:", sessionId);
-			supabase.removeChannel(participantsChannel);
-			supabase.removeChannel(sessionChannel);
+			supabase.removeChannel(channel);
 		};
-	}, [sessionId, loadSession, loadParticipants]);
+	}, [sessionId]);
 
-	const updateStatus = async (status: Session["status"]) => {
-		if (!sessionId) return;
+	// NEW: Update test progress WITHOUT triggering submission
+	// Use this when running tests from the Test Cases panel or Run button
+	const updateTestProgress = useCallback(
+		async (code: string, testResults: any) => {
+			if (!sessionId || !currentUserId) {
+				throw new Error("Session or user not available");
+			}
 
-		try {
-			console.log("Updating session status to:", status);
+			await sessionService.updateTestProgress(
+				sessionId,
+				currentUserId,
+				code,
+				testResults
+			);
+		},
+		[sessionId, currentUserId]
+	);
+
+	// Submit code (final submission)
+	// Use this ONLY when the user clicks the Submit button
+	const submitCode = useCallback(
+		async (code: string, testResults: any) => {
+			if (!sessionId || !currentUserId) {
+				throw new Error("Session or user not available");
+			}
+
+			await sessionService.submitCode(
+				sessionId,
+				currentUserId,
+				code,
+				testResults
+			);
+		},
+		[sessionId, currentUserId]
+	);
+
+	// Update session status
+	const updateStatus = useCallback(
+		async (
+			status:
+				| "waiting"
+				| "in_progress"
+				| "completing"
+				| "completed"
+				| "cancelled"
+		) => {
+			if (!sessionId) {
+				throw new Error("Session not available");
+			}
+
 			await sessionService.updateSessionStatus(sessionId, status);
-			// The real-time subscription will handle reloading
-		} catch (err: any) {
-			setError(err.message);
-		}
-	};
-
-	const submitCode = async (code: string, testResults: any) => {
-		if (!sessionId) return;
-
-		try {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user) throw new Error("Not authenticated");
-
-			await sessionService.submitCode(sessionId, user.id, code, testResults);
-			// The real-time subscription will handle reloading
-		} catch (err: any) {
-			setError(err.message);
-		}
-	};
+		},
+		[sessionId]
+	);
 
 	return {
 		session,
 		participants,
 		loading,
 		error,
-		updateStatus,
+		updateTestProgress,
 		submitCode,
-		reload: loadSession,
+		updateStatus,
+		refetch: fetchSession,
 	};
-};
+}

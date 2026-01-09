@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { OutputPanel } from "./editor/OutputPanel";
 import { ProblemPanel } from "./problem-panel/ProblemPanel";
@@ -13,6 +13,10 @@ import { SubmissionModal } from "./modals/SubmissionModal";
 
 import { useSession } from "../../hooks/useSession";
 import { matchCompletionService } from "../../services/matchCompletionService";
+import {
+	sessionActivityService,
+	type SessionActivity,
+} from "../../services/sessionActivityService";
 import { supabase } from "../../lib/supabase";
 import { executeCode } from "../../services/judge0Service";
 
@@ -33,22 +37,24 @@ interface Participant {
 }
 
 interface Activity {
-	id: number;
+	id: string;
 	type: "passed" | "failed" | "ran" | "modifying" | "submitted";
 	message: string;
 	timestamp: string;
+	userId?: string;
 }
 
 export default function MatchPage() {
 	const { sessionId } = useParams<{ sessionId: string }>();
 	const navigate = useNavigate();
 
-	// Hooks
+	// Hooks - now includes updateTestProgress separate from submitCode
 	const {
 		session,
 		participants: dbParticipants,
 		loading,
 		error,
+		updateTestProgress,
 		submitCode,
 		updateStatus,
 	} = useSession(sessionId || null);
@@ -80,11 +86,12 @@ export default function MatchPage() {
 	// State for participants (transformed from DB)
 	const [participants, setParticipants] = useState<Participant[]>([]);
 
-	// State for activities
+	// State for activities - now synced from database
 	const [activities, setActivities] = useState<Activity[]>([]);
 
 	// Current user
 	const [currentUserId, setCurrentUserId] = useState<string>("");
+	const [currentUsername, setCurrentUsername] = useState<string>("");
 
 	// Check if we should show waiting lobby
 	const [showWaitingLobby, setShowWaitingLobby] = useState(true);
@@ -108,6 +115,9 @@ export default function MatchPage() {
 			} = await supabase.auth.getUser();
 			if (user) {
 				setCurrentUserId(user.id);
+				setCurrentUsername(
+					user.user_metadata?.username || user.email?.split("@")[0] || "User"
+				);
 			} else {
 				navigate("/explore");
 			}
@@ -261,117 +271,108 @@ export default function MatchPage() {
 		return () => clearInterval(timer);
 	}, [timerStarted, seconds, hasSubmitted]);
 
-	// Subscribe to real-time participant updates
+	// Helper to format activity from DB to UI format
+	const formatActivity = useCallback(
+		(dbActivity: SessionActivity): Activity => {
+			const isCurrentUser = dbActivity.user_id === currentUserId;
+			const time = new Date(dbActivity.created_at);
+			const now = new Date();
+			const diffMs = now.getTime() - time.getTime();
+			const diffMins = Math.floor(diffMs / 60000);
+
+			let timestamp: string;
+			if (diffMins < 1) {
+				timestamp = "now";
+			} else if (diffMins < 60) {
+				timestamp = `${diffMins}m ago`;
+			} else {
+				timestamp = time.toLocaleTimeString("en-US", {
+					hour: "2-digit",
+					minute: "2-digit",
+				});
+			}
+
+			// Replace username with "You" for current user
+			let message = dbActivity.message;
+			if (isCurrentUser && !message.startsWith("You")) {
+				message = message.replace(dbActivity.username, "You");
+			}
+
+			return {
+				id: dbActivity.id,
+				type: dbActivity.type,
+				message,
+				timestamp,
+				userId: dbActivity.user_id,
+			};
+		},
+		[currentUserId]
+	);
+
+	// Load existing activities and subscribe to new ones
 	useEffect(() => {
-		if (!sessionId || showWaitingLobby) return;
+		if (!sessionId || showWaitingLobby || !currentUserId) return;
 
-		const channel = supabase
-			.channel(`session-activities:${sessionId}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "UPDATE",
-					schema: "public",
-					table: "session_participants",
-					filter: `session_id=eq.${sessionId}`,
-				},
-				(payload) => {
-					console.log("Participant activity update:", payload);
-
-					const participant = payload.new as any;
-					const user = dbParticipants?.find(
-						(p) => p.user_id === participant.user_id
-					);
-
-					if (participant.is_correct && participant.user_id !== currentUserId) {
-						addActivity({
-							type: "submitted",
-							message: `${
-								user?.user?.username || "Player"
-							} completed the problem!`,
-							timestamp: "now",
-						});
-					}
-				}
-			)
-			.subscribe((status) => {
-				console.log("Activities subscription status:", status);
-			});
-
-		return () => {
-			supabase.removeChannel(channel);
+		// Load existing activities
+		const loadActivities = async () => {
+			try {
+				const existingActivities = await sessionActivityService.getActivities(
+					sessionId
+				);
+				const formattedActivities: Activity[] = existingActivities.map(
+					(a: SessionActivity) => formatActivity(a)
+				);
+				setActivities(formattedActivities);
+			} catch (error) {
+				console.error("Error loading activities:", error);
+			}
 		};
-	}, [sessionId, dbParticipants, currentUserId, showWaitingLobby]);
 
-	// Subscribe to real-time test activities
-	useEffect(() => {
-		if (!sessionId || showWaitingLobby) return;
+		loadActivities();
 
-		const channel = supabase
-			.channel(`session-test-activities:${sessionId}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "UPDATE",
-					schema: "public",
-					table: "session_participants",
-					filter: `session_id=eq.${sessionId}`,
-				},
-				(payload) => {
-					console.log("Test activity update:", payload);
+		// Subscribe to new activities
+		const channel = sessionActivityService.subscribeToActivities(
+			sessionId,
+			(newActivity: SessionActivity) => {
+				console.log("New activity from subscription:", newActivity);
 
-					const participant = payload.new as any;
-					const oldParticipant = payload.old as any;
-
-					// Don't show activities for current user
-					if (participant.user_id === currentUserId) return;
-
-					const user = dbParticipants?.find(
-						(p) => p.user_id === participant.user_id
-					);
-					const username = user?.user?.username || "Player";
-
-					// Check for test results changes
-					const oldResults = oldParticipant.test_results || {};
-					const newResults = participant.test_results || {};
-
-					if (newResults.passedCount !== oldResults.passedCount) {
-						const passedCount = newResults.passedCount || 0;
-						const totalCount = newResults.totalCount || 0;
-
-						addActivity({
-							type: "ran",
-							message: `${username} ran tests (${passedCount}/${totalCount} passed)`,
-							timestamp: "now",
-						});
-					}
-
-					// Check for submission
-					if (participant.submission_time && !oldParticipant.submission_time) {
-						if (participant.is_correct) {
-							addActivity({
-								type: "submitted",
-								message: `${username} completed the problem! ✅`,
-								timestamp: "now",
-							});
-						} else {
-							addActivity({
-								type: "submitted",
-								message: `${username} submitted their solution`,
-								timestamp: "now",
-							});
+				// Skip if this is from the current user (we already added it optimistically)
+				if (newActivity.user_id === currentUserId) {
+					// Replace the temp activity with the real one (to get the real ID)
+					setActivities((prev) => {
+						// Find and replace temp activity with same message pattern
+						const tempIndex = prev.findIndex(
+							(a) => a.id.startsWith("temp-") && a.userId === currentUserId
+						);
+						if (tempIndex !== -1) {
+							const updated = [...prev];
+							updated[tempIndex] = formatActivity(newActivity);
+							return updated;
 						}
-					}
+						// If no temp found, check for exact duplicate
+						if (prev.some((a) => a.id === newActivity.id)) {
+							return prev;
+						}
+						return prev;
+					});
+					return;
 				}
-			)
-			.subscribe((status) => {
-				console.log("Test activities subscription status:", status);
-			});
+
+				setActivities((prev) => {
+					// Avoid duplicates
+					if (prev.some((a) => a.id === newActivity.id)) {
+						return prev;
+					}
+					// Add new activity at the beginning
+					return [formatActivity(newActivity), ...prev.slice(0, 9)];
+				});
+			}
+		);
 
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [sessionId, dbParticipants, currentUserId, showWaitingLobby]);
+	}, [sessionId, showWaitingLobby, currentUserId, formatActivity]);
 
 	// Set up auto-finalization when all participants submit (but don't navigate)
 	useEffect(() => {
@@ -382,18 +383,40 @@ export default function MatchPage() {
 		return cleanup;
 	}, [sessionId, showWaitingLobby]);
 
-	// Add activity helper
-	const addActivity = (activity: Omit<Activity, "id">) => {
-		setActivities((prev) => [
-			{
-				...activity,
-				id: Date.now(),
-			},
-			...prev.slice(0, 9), // Keep last 10 activities
-		]);
-	};
+	// Add activity helper - now saves to database
+	const addActivity = useCallback(
+		async (type: Activity["type"], message: string) => {
+			if (!sessionId || !currentUserId || !currentUsername) return;
 
-	// Run single test case
+			// Optimistically add to local state
+			const tempId = `temp-${Date.now()}`;
+			const newActivity: Activity = {
+				id: tempId,
+				type,
+				message,
+				timestamp: "now",
+				userId: currentUserId,
+			};
+
+			setActivities((prev) => [newActivity, ...prev.slice(0, 9)]);
+
+			// Save to database (this will trigger real-time for other users)
+			try {
+				await sessionActivityService.addActivity(
+					sessionId,
+					currentUserId,
+					currentUsername,
+					type,
+					message.replace("You", currentUsername) // Store with actual username
+				);
+			} catch (error) {
+				console.error("Error saving activity:", error);
+			}
+		},
+		[sessionId, currentUserId, currentUsername]
+	);
+
+	// Run single test case or all test cases
 	const runTest = async (testIndex: number | "all") => {
 		if (!session?.problem) return;
 
@@ -444,8 +467,8 @@ export default function MatchPage() {
 
 				setOutput(newOutput);
 
-				// Update progress in database for real-time sync (without submission_time)
-				await submitCode(code, {
+				// Update progress in database WITHOUT setting submission_time
+				await updateTestProgress(code, {
 					passedCount,
 					totalCount: results.length,
 					results: results.map((r) => r.status === "pass"),
@@ -460,12 +483,11 @@ export default function MatchPage() {
 					)
 				);
 
-				// Add activity
-				addActivity({
-					type: "ran",
-					message: `You ran all test cases (${passedCount}/${results.length} passed)`,
-					timestamp: "now",
-				});
+				// Add activity - saves to DB for real-time sync
+				await addActivity(
+					"ran",
+					`You ran all test cases (${passedCount}/${results.length} passed)`
+				);
 			} else {
 				// Run single test case
 				const testCase = testCases[testIndex];
@@ -502,19 +524,32 @@ export default function MatchPage() {
 					},
 				]);
 
-				// Add activity for pass/fail
+				// Update progress without submission
+				const passedCount = updatedTestCases.filter(
+					(tc) => tc.status === "pass"
+				).length;
+				const totalCount = updatedTestCases.length;
+
+				await updateTestProgress(code, {
+					passedCount,
+					totalCount,
+					results: updatedTestCases.map((tc) => tc.status === "pass"),
+				});
+
+				// Update local progress
+				setParticipants((prev) =>
+					prev.map((p) =>
+						p.id === currentUserId
+							? { ...p, progress: (passedCount / totalCount) * 100 }
+							: p
+					)
+				);
+
+				// Add activity for pass/fail - saves to DB
 				if (passed) {
-					addActivity({
-						type: "passed",
-						message: `You passed Test Case ${testIndex + 1}`,
-						timestamp: "now",
-					});
+					await addActivity("passed", `You passed Test Case ${testIndex + 1}`);
 				} else {
-					addActivity({
-						type: "failed",
-						message: `You failed Test Case ${testIndex + 1}`,
-						timestamp: "now",
-					});
+					await addActivity("failed", `You failed Test Case ${testIndex + 1}`);
 				}
 			}
 		} catch (error: any) {
@@ -526,12 +561,12 @@ export default function MatchPage() {
 		}
 	};
 
-	// Handle Run button
+	// Handle Run button (same as Run All)
 	const handleRun = () => {
 		runTest("all");
 	};
 
-	// Handle Submit button - UPDATED LOGIC
+	// Handle Submit button - ACTUAL SUBMISSION
 	const handleSubmit = async () => {
 		if (!sessionId || !session || hasSubmitted) return;
 
@@ -562,7 +597,7 @@ export default function MatchPage() {
 			const allPassed = results.every((r) => r);
 			const passedCount = results.filter((r) => r).length;
 
-			// Submit to database - THIS TRIGGERS THE BACKGROUND PROCESS
+			// ACTUAL SUBMISSION - This sets submission_time and triggers finalization
 			await submitCode(code, {
 				allPassed,
 				passedCount,
@@ -597,14 +632,11 @@ export default function MatchPage() {
 				)
 			);
 
-			// Add activity
-			addActivity({
-				type: "submitted",
-				message: allPassed
-					? "You completed the problem!"
-					: "You submitted your solution",
-				timestamp: "now",
-			});
+			// Add activity - saves to DB for other users to see
+			await addActivity(
+				"submitted",
+				allPassed ? "You completed the problem!" : "You submitted your solution"
+			);
 
 			// Update output for display
 			setOutput([
@@ -618,10 +650,6 @@ export default function MatchPage() {
 					status: "normal",
 				},
 			]);
-
-			// NOTE: We do NOT check for completion or navigate here
-			// The background listener will handle finalization
-			// The notification will allow navigation to summary page
 		} catch (error: any) {
 			console.error("Error submitting:", error);
 			setHasSubmitted(false);

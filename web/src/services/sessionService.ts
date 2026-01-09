@@ -298,7 +298,30 @@ export const sessionService = {
 		if (error) throw error;
 	},
 
-	// Submit code for a participant
+	// NEW: Update test progress WITHOUT setting submission_time
+	// Use this when running tests (not submitting)
+	async updateTestProgress(
+		sessionId: string,
+		userId: string,
+		code: string,
+		testResults: any
+	): Promise<void> {
+		const { error } = await supabase
+			.from("session_participants")
+			.update({
+				code_snapshot: code,
+				test_results: testResults,
+				// Note: NOT setting submission_time or is_correct here
+				// This is just progress tracking, not a final submission
+			})
+			.eq("session_id", sessionId)
+			.eq("user_id", userId);
+
+		if (error) throw error;
+	},
+
+	// Submit code for a participant (FINAL submission only)
+	// This sets submission_time which triggers finalization checks
 	async submitCode(
 		sessionId: string,
 		userId: string,

@@ -11,6 +11,12 @@ export type ParticipantStatus = "invited" | "joined" | "declined" | "left";
 export type ParticipantRole = "host" | "participant" | "viewer";
 export type Difficulty = "Easy" | "Medium" | "Hard";
 export type MatchResult = "win" | "loss" | "draw";
+export type ActivityType =
+	| "passed"
+	| "failed"
+	| "ran"
+	| "modifying"
+	| "submitted";
 
 export interface Profile {
 	id: string;
@@ -139,6 +145,17 @@ export interface ChatMessage {
 	session_id: string;
 	user_id: string;
 	username: string;
+	message: string;
+	created_at: string;
+}
+
+// NEW: Session Activity for real-time activity feed
+export interface SessionActivity {
+	id: string;
+	session_id: string;
+	user_id: string;
+	username: string;
+	type: ActivityType;
 	message: string;
 	created_at: string;
 }
