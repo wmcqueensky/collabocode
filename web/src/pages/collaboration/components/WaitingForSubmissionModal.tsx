@@ -37,11 +37,24 @@ export const WaitingForSubmissionModal = ({
 		return () => clearInterval(interval);
 	}, [isOpen]);
 
-	// Check if all submitted
+	// Check if all participants are ready to submit
 	const joinedParticipants = participants.filter((p) => p.status === "joined");
-	const submittedCount = joinedParticipants.filter(
-		(p) => p.submission_time
-	).length;
+
+	// Check for ready_to_submit flag in test_results (new way)
+	// or fall back to submission_time (old way for backward compatibility)
+	const readyCount = joinedParticipants.filter((p) => {
+		const testResults = p.test_results as any;
+		return testResults?.ready_to_submit || p.submission_time;
+	}).length;
+
+	// Check if all have final_submission (actual code submitted)
+	const submittedCount = joinedParticipants.filter((p) => {
+		const testResults = p.test_results as any;
+		return testResults?.final_submission;
+	}).length;
+
+	const allReady =
+		readyCount === joinedParticipants.length && joinedParticipants.length > 0;
 	const allSubmitted =
 		submittedCount === joinedParticipants.length &&
 		joinedParticipants.length > 0;
@@ -58,7 +71,6 @@ export const WaitingForSubmissionModal = ({
 		if (redirectCountdown === null) return;
 
 		if (redirectCountdown === 0) {
-			// Navigate to explore page - they'll get a notification when results are ready
 			if (onAllSubmitted) {
 				onAllSubmitted();
 			} else {
@@ -82,6 +94,17 @@ export const WaitingForSubmissionModal = ({
 		return `${mins}:${secs.toString().padStart(2, "0")}`;
 	};
 
+	// Helper to get participant status
+	const getParticipantStatus = (participant: SessionParticipant) => {
+		const testResults = participant.test_results as any;
+		if (testResults?.final_submission) {
+			return "submitted";
+		} else if (testResults?.ready_to_submit || participant.submission_time) {
+			return "ready";
+		}
+		return "working";
+	};
+
 	return (
 		<div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
 			<div className="bg-[#1f1f1f] rounded-xl border border-gray-700 p-6 max-w-md w-full mx-4">
@@ -102,6 +125,18 @@ export const WaitingForSubmissionModal = ({
 								You'll receive a notification when team results are ready
 							</p>
 						</>
+					) : allReady ? (
+						<>
+							<div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+								<Loader2 size={32} className="text-blue-500 animate-spin" />
+							</div>
+							<h2 className="text-xl font-bold text-white mb-2">
+								All Ready - Evaluating Code...
+							</h2>
+							<p className="text-gray-400 text-sm">
+								Running final tests on your team's solution
+							</p>
+						</>
 					) : (
 						<>
 							<div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -111,7 +146,7 @@ export const WaitingForSubmissionModal = ({
 								Waiting for Team Members
 							</h2>
 							<p className="text-gray-400 text-sm">
-								Please wait while your teammates finish and submit
+								Your teammates can still edit the code until they click Submit
 							</p>
 						</>
 					)}
@@ -120,9 +155,9 @@ export const WaitingForSubmissionModal = ({
 				{/* Progress */}
 				<div className="mb-6">
 					<div className="flex justify-between items-center mb-2 text-sm">
-						<span className="text-gray-400">Team Submissions</span>
+						<span className="text-gray-400">Team Ready</span>
 						<span className="text-white font-medium">
-							{submittedCount} / {joinedParticipants.length}
+							{readyCount} / {joinedParticipants.length}
 						</span>
 					</div>
 					<div className="h-2 bg-gray-700 rounded-full overflow-hidden">
@@ -130,12 +165,13 @@ export const WaitingForSubmissionModal = ({
 							className={`h-full transition-all duration-500 ${
 								allSubmitted
 									? "bg-green-500"
+									: allReady
+									? "bg-blue-500"
 									: "bg-gradient-to-r from-purple-500 to-purple-600"
 							}`}
 							style={{
 								width: `${
-									(submittedCount / Math.max(joinedParticipants.length, 1)) *
-									100
+									(readyCount / Math.max(joinedParticipants.length, 1)) * 100
 								}%`,
 							}}
 						/>
@@ -146,7 +182,7 @@ export const WaitingForSubmissionModal = ({
 				<div className="space-y-2 mb-6">
 					{joinedParticipants.map((participant) => {
 						const isCurrentUser = participant.user_id === currentUserId;
-						const hasSubmitted = !!participant.submission_time;
+						const status = getParticipantStatus(participant);
 
 						return (
 							<div
@@ -160,8 +196,10 @@ export const WaitingForSubmissionModal = ({
 								<div className="flex items-center space-x-3">
 									<div
 										className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-											hasSubmitted
+											status === "submitted"
 												? "bg-green-500 text-white"
+												: status === "ready"
+												? "bg-blue-500 text-white"
 												: "bg-gray-600 text-gray-300"
 										}`}
 									>
@@ -178,10 +216,15 @@ export const WaitingForSubmissionModal = ({
 								</div>
 
 								<div className="flex items-center">
-									{hasSubmitted ? (
+									{status === "submitted" ? (
 										<div className="flex items-center text-green-500">
 											<CheckCircle size={16} className="mr-1" />
 											<span className="text-xs">Submitted</span>
+										</div>
+									) : status === "ready" ? (
+										<div className="flex items-center text-blue-500">
+											<CheckCircle size={16} className="mr-1" />
+											<span className="text-xs">Ready</span>
 										</div>
 									) : (
 										<div className="flex items-center text-yellow-500">
@@ -214,10 +257,9 @@ export const WaitingForSubmissionModal = ({
 				</div>
 
 				{/* Info message */}
-				{!allSubmitted && (
+				{!allReady && (
 					<p className="text-center text-gray-500 text-xs mt-4">
-						You can leave and come back - you'll be notified when team results
-						are ready
+						💡 The final code will be captured when all teammates click Submit
 					</p>
 				)}
 			</div>

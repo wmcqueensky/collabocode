@@ -48,7 +48,6 @@ interface TestCase {
 
 /**
  * Adapter class that wraps SupabaseYjsProvider to match CollaborationDocument interface
- * This allows us to use single-file collaboration with the existing CollaborativeMonacoEditor
  */
 class CollaborationDocumentAdapter implements CollaborationDocument {
 	public readonly provider: SupabaseYjsProvider;
@@ -79,7 +78,6 @@ class CollaborationDocumentAdapter implements CollaborationDocument {
 	}
 
 	connect(): void {
-		// Already connected via provider
 		this._isConnected = true;
 	}
 
@@ -118,7 +116,7 @@ export default function CollaborationPage() {
 	const [seconds, setSeconds] = useState(0);
 	const [timeStr, setTimeStr] = useState("00:00");
 
-	// Yjs Collaboration state - single shared document
+	// Yjs Collaboration state
 	const yjsProviderRef = useRef<SupabaseYjsProvider | null>(null);
 	const [collaborationDoc, setCollaborationDoc] =
 		useState<CollaborationDocument | null>(null);
@@ -144,8 +142,13 @@ export default function CollaborationPage() {
 	const [isMobile, setIsMobile] = useState(false);
 
 	// Submission state
+	// "hasClickedSubmit" = user clicked submit, waiting for others
+	// "hasSubmitted" = final code captured and evaluated
+	const [hasClickedSubmit, setHasClickedSubmit] = useState(false);
 	const [hasSubmitted, setHasSubmitted] = useState(false);
 	const [showWaitingModal, setShowWaitingModal] = useState(false);
+	const [isProcessingFinalSubmission, setIsProcessingFinalSubmission] =
+		useState(false);
 
 	// Check screen size
 	useEffect(() => {
@@ -203,7 +206,6 @@ export default function CollaborationPage() {
 					return;
 				}
 
-				// Redirect if wrong session type
 				if (sessionData.type !== "collaboration") {
 					navigate(`/match/${sessionId}`);
 					return;
@@ -216,16 +218,21 @@ export default function CollaborationPage() {
 				);
 				setParticipants(participantsData);
 
-				// Check if current user has already submitted
+				// Check if current user has already marked ready_to_submit
 				const currentParticipant = participantsData.find(
 					(p) => p.user_id === currentUserId
 				);
 				if (currentParticipant?.submission_time) {
-					setHasSubmitted(true);
-					setShowWaitingModal(true);
+					const testResults = currentParticipant.test_results as any;
+					if (testResults?.ready_to_submit && !testResults?.final_submission) {
+						setHasClickedSubmit(true);
+						setShowWaitingModal(true);
+					} else if (testResults?.final_submission) {
+						setHasSubmitted(true);
+						setShowWaitingModal(true);
+					}
 				}
 
-				// Check session status
 				if (sessionData.status === "in_progress") {
 					setShowWaitingLobby(false);
 				} else if (sessionData.status === "completed") {
@@ -233,7 +240,6 @@ export default function CollaborationPage() {
 					return;
 				}
 
-				// Initialize test cases from problem
 				if (sessionData.problem?.test_cases) {
 					const cases = sessionData.problem.test_cases.map((tc: any) => ({
 						input: tc.input,
@@ -243,7 +249,6 @@ export default function CollaborationPage() {
 					setTestCases(cases);
 				}
 
-				// Get starter code
 				if (sessionData.problem?.starter_code) {
 					const code =
 						sessionData.problem.starter_code[sessionData.language] ||
@@ -262,7 +267,7 @@ export default function CollaborationPage() {
 		loadSession();
 	}, [sessionId, currentUserId, navigate]);
 
-	// Initialize Yjs provider for shared collaboration document
+	// Initialize Yjs provider
 	useEffect(() => {
 		if (
 			!sessionId ||
@@ -274,13 +279,11 @@ export default function CollaborationPage() {
 			return;
 		}
 
-		// Create single shared document for the session
 		const roomName = `collab-${sessionId}`;
 		const doc = new Y.Doc();
 
 		const provider = new SupabaseYjsProvider(roomName, doc, currentUserId);
 
-		// Set user awareness (cursor color, name)
 		const colors = getUserColor(currentUserId);
 		provider.setLocalState({
 			user: {
@@ -292,18 +295,15 @@ export default function CollaborationPage() {
 			cursor: null,
 		});
 
-		// Handle sync
 		provider.onSync(() => {
 			console.log(`[Yjs] Synced for collaboration session: ${sessionId}`);
 			setIsYjsConnected(true);
 
-			// Initialize with starter code if document is empty
 			const ytext = provider.doc.getText("content");
 			if (ytext.toString() === "" && starterCode) {
 				ytext.insert(0, starterCode);
 			}
 
-			// Create the adapter that implements CollaborationDocument interface
 			const adapter = new CollaborationDocumentAdapter(
 				provider,
 				sessionId,
@@ -313,7 +313,6 @@ export default function CollaborationPage() {
 			setCollaborationDoc(adapter);
 		});
 
-		// Handle awareness changes (remote cursors)
 		provider.onAwarenessChange((states) => {
 			setRemoteCursors(states);
 		});
@@ -332,6 +331,98 @@ export default function CollaborationPage() {
 		showWaitingLobby,
 		session,
 		starterCode,
+	]);
+
+	// Get current code from Yjs document
+	const getCurrentCode = useCallback((): string => {
+		if (yjsProviderRef.current) {
+			return yjsProviderRef.current.doc.getText("content").toString();
+		}
+		return starterCode;
+	}, [starterCode]);
+
+	// Process final submission when all players are ready
+	const processFinalSubmission = useCallback(async () => {
+		if (!sessionId || !session || isProcessingFinalSubmission || hasSubmitted)
+			return;
+
+		setIsProcessingFinalSubmission(true);
+		console.log("Processing final submission for all players...");
+
+		try {
+			// Get the FINAL code from Yjs (shared, latest version)
+			const finalCode = getCurrentCode();
+
+			// Run tests on the final code
+			const results = await Promise.all(
+				testCases.map(async (testCase) => {
+					try {
+						const result = await executeCode(
+							finalCode,
+							session.language,
+							JSON.stringify(testCase.input)
+						);
+						return (
+							result.status === "success" &&
+							result.output?.trim() === JSON.stringify(testCase.output)
+						);
+					} catch {
+						return false;
+					}
+				})
+			);
+
+			const allPassed = results.every((r) => r);
+			const passedCount = results.filter((r) => r).length;
+
+			// Update current user's record with final submission
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+
+			if (user) {
+				await supabase
+					.from("session_participants")
+					.update({
+						code_snapshot: finalCode,
+						is_correct: allPassed,
+						test_results: {
+							passedCount,
+							totalCount: results.length,
+							results,
+							ready_to_submit: true,
+							final_submission: true,
+						},
+					})
+					.eq("session_id", sessionId)
+					.eq("user_id", user.id);
+			}
+
+			setHasSubmitted(true);
+
+			setOutput([
+				{ message: "✓ Team solution submitted successfully!", status: "pass" },
+				{
+					message: `${passedCount}/${results.length} test cases passed`,
+					status: allPassed ? "pass" : "fail",
+				},
+			]);
+		} catch (err: any) {
+			console.error("Error processing final submission:", err);
+			setOutput([
+				{ message: "Error submitting solution", status: "fail" },
+				{ message: err.message || "Unknown error", status: "fail" },
+			]);
+		} finally {
+			setIsProcessingFinalSubmission(false);
+		}
+	}, [
+		sessionId,
+		session,
+		isProcessingFinalSubmission,
+		hasSubmitted,
+		getCurrentCode,
+		testCases,
 	]);
 
 	// Subscribe to real-time participant updates
@@ -353,6 +444,29 @@ export default function CollaborationPage() {
 						sessionId
 					);
 					setParticipants(updated);
+
+					// Check if all participants are now ready to submit
+					const joinedParticipants = updated.filter(
+						(p) => p.status === "joined"
+					);
+					const allReadyToSubmit = joinedParticipants.every((p) => {
+						const testResults = p.test_results as any;
+						return (
+							testResults?.ready_to_submit || testResults?.final_submission
+						);
+					});
+
+					// If all ready and we clicked submit but haven't processed final yet
+					if (
+						allReadyToSubmit &&
+						joinedParticipants.length > 0 &&
+						hasClickedSubmit &&
+						!hasSubmitted &&
+						!isProcessingFinalSubmission
+					) {
+						console.log("All participants ready - processing final submission");
+						await processFinalSubmission();
+					}
 				}
 			)
 			.subscribe();
@@ -382,7 +496,15 @@ export default function CollaborationPage() {
 			supabase.removeChannel(participantChannel);
 			supabase.removeChannel(sessionChannel);
 		};
-	}, [sessionId, showWaitingLobby, navigate]);
+	}, [
+		sessionId,
+		showWaitingLobby,
+		navigate,
+		hasClickedSubmit,
+		hasSubmitted,
+		isProcessingFinalSubmission,
+		processFinalSubmission,
+	]);
 
 	// Timer effect
 	useEffect(() => {
@@ -401,7 +523,7 @@ export default function CollaborationPage() {
 			const secs = remainingSeconds % 60;
 			setTimeStr(`${mins}:${secs.toString().padStart(2, "0")}`);
 
-			if (remainingSeconds === 0 && !hasSubmitted) {
+			if (remainingSeconds === 0 && !hasClickedSubmit) {
 				handleSubmit();
 			}
 		};
@@ -409,7 +531,7 @@ export default function CollaborationPage() {
 		updateTimer();
 		const interval = setInterval(updateTimer, 1000);
 		return () => clearInterval(interval);
-	}, [session, showWaitingLobby, hasSubmitted]);
+	}, [session, showWaitingLobby, hasClickedSubmit]);
 
 	// Handle start session
 	const handleStartSession = async () => {
@@ -417,20 +539,18 @@ export default function CollaborationPage() {
 
 		try {
 			await sessionService.updateSessionStatus(sessionId, "in_progress");
+
+			const updatedSession = await sessionService.getSessionById(sessionId);
+			if (updatedSession) {
+				setSession(updatedSession);
+			}
+
 			setShowWaitingLobby(false);
 		} catch (err: any) {
 			console.error("Error starting session:", err);
 			setError(err.message || "Failed to start session");
 		}
 	};
-
-	// Get current code from Yjs document
-	const getCurrentCode = useCallback((): string => {
-		if (yjsProviderRef.current) {
-			return yjsProviderRef.current.doc.getText("content").toString();
-		}
-		return starterCode;
-	}, [starterCode]);
 
 	// Handle run code
 	const handleRun = async () => {
@@ -492,68 +612,62 @@ export default function CollaborationPage() {
 		}
 	};
 
-	// Handle submit
+	// Handle submit - marks user as ready, waits for all players
 	const handleSubmit = async () => {
-		if (!sessionId || !session || hasSubmitted) return;
+		if (!sessionId || !session || hasClickedSubmit) return;
 
-		setOutput([{ message: "Submitting solution...", status: "normal" }]);
+		setOutput([{ message: "Marking as ready to submit...", status: "normal" }]);
 
 		try {
-			const code = getCurrentCode();
-
-			// Run tests
-			const results = await Promise.all(
-				testCases.map(async (testCase) => {
-					try {
-						const result = await executeCode(
-							code,
-							session.language,
-							JSON.stringify(testCase.input)
-						);
-						return (
-							result.status === "success" &&
-							result.output?.trim() === JSON.stringify(testCase.output)
-						);
-					} catch {
-						return false;
-					}
-				})
-			);
-
-			const allPassed = results.every((r) => r);
-			const passedCount = results.filter((r) => r).length;
-
-			// Submit to database
 			const {
 				data: { user },
 			} = await supabase.auth.getUser();
+
 			if (user) {
+				// Mark this user as ready (don't capture code yet - wait for all)
 				await supabase
 					.from("session_participants")
 					.update({
 						submission_time: new Date().toISOString(),
-						code_snapshot: code,
-						is_correct: allPassed,
-						test_results: { passedCount, totalCount: results.length, results },
+						test_results: {
+							ready_to_submit: true,
+							final_submission: false,
+						},
 					})
 					.eq("session_id", sessionId)
 					.eq("user_id", user.id);
 			}
 
-			setHasSubmitted(true);
+			setHasClickedSubmit(true);
 			setShowWaitingModal(true);
 
 			setOutput([
-				{ message: "✓ Solution submitted successfully!", status: "pass" },
-				{
-					message: `${passedCount}/${results.length} test cases passed`,
-					status: allPassed ? "pass" : "fail",
-				},
+				{ message: "✓ You're ready to submit!", status: "pass" },
+				{ message: "Waiting for teammates to submit...", status: "normal" },
 			]);
+
+			// Check if all participants are already ready (we might be the last one)
+			const updatedParticipants = await sessionService.getSessionParticipants(
+				sessionId
+			);
+			const joinedParticipants = updatedParticipants.filter(
+				(p) => p.status === "joined"
+			);
+			const allReadyToSubmit = joinedParticipants.every((p) => {
+				const testResults = p.test_results as any;
+				return testResults?.ready_to_submit;
+			});
+
+			if (allReadyToSubmit && joinedParticipants.length > 0) {
+				console.log(
+					"All participants ready (including self) - processing final submission"
+				);
+				await processFinalSubmission();
+			}
 		} catch (err: any) {
-			console.error("Error submitting:", err);
+			console.error("Error marking ready to submit:", err);
 			setOutput([
-				{ message: "Error submitting solution", status: "fail" },
+				{ message: "Error marking ready to submit", status: "fail" },
 				{ message: err.message || "Unknown error", status: "fail" },
 			]);
 		}
@@ -700,23 +814,32 @@ export default function CollaborationPage() {
 					{/* Run & Submit */}
 					<button
 						onClick={handleRun}
-						className="flex items-center space-x-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
+						disabled={hasClickedSubmit}
+						className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm ${
+							hasClickedSubmit
+								? "bg-gray-600 text-gray-400 cursor-not-allowed"
+								: "bg-gray-700 hover:bg-gray-600 text-white"
+						}`}
 					>
 						<Play size={14} />
 						<span className="hidden sm:inline">Run</span>
 					</button>
 					<button
 						onClick={handleSubmit}
-						disabled={hasSubmitted}
+						disabled={hasClickedSubmit}
 						className={`flex items-center space-x-1 px-3 py-1.5 rounded text-sm ${
-							hasSubmitted
+							hasClickedSubmit
 								? "bg-green-600 text-white cursor-not-allowed"
 								: "bg-purple-500 hover:bg-purple-600 text-white"
 						}`}
 					>
-						{hasSubmitted ? <CheckCircle size={14} /> : <Send size={14} />}
+						{hasClickedSubmit ? <CheckCircle size={14} /> : <Send size={14} />}
 						<span className="hidden sm:inline">
-							{hasSubmitted ? "Submitted" : "Submit"}
+							{hasClickedSubmit
+								? hasSubmitted
+									? "Submitted"
+									: "Ready"
+								: "Submit"}
 						</span>
 					</button>
 				</div>
@@ -786,6 +909,11 @@ export default function CollaborationPage() {
 										<span className="text-green-400 text-xs">● Live</span>
 									)}
 								</div>
+								{hasClickedSubmit && !hasSubmitted && (
+									<span className="ml-2 text-xs text-yellow-400">
+										⏳ Waiting for teammates...
+									</span>
+								)}
 							</div>
 
 							{/* Collaborative Monaco Editor */}
@@ -892,20 +1020,29 @@ export default function CollaborationPage() {
 					<div className="flex items-center space-x-2">
 						<button
 							onClick={handleRun}
-							className="px-3 py-1.5 bg-gray-700 text-white rounded text-xs"
+							disabled={hasClickedSubmit}
+							className={`px-3 py-1.5 rounded text-xs ${
+								hasClickedSubmit
+									? "bg-gray-600 text-gray-400"
+									: "bg-gray-700 text-white"
+							}`}
 						>
 							Run
 						</button>
 						<button
 							onClick={handleSubmit}
-							disabled={hasSubmitted}
+							disabled={hasClickedSubmit}
 							className={`px-3 py-1.5 rounded text-xs ${
-								hasSubmitted
+								hasClickedSubmit
 									? "bg-green-600 text-white"
 									: "bg-purple-500 text-white"
 							}`}
 						>
-							{hasSubmitted ? "Done ✓" : "Submit"}
+							{hasClickedSubmit
+								? hasSubmitted
+									? "Done ✓"
+									: "Ready ✓"
+								: "Submit"}
 						</button>
 					</div>
 				</div>

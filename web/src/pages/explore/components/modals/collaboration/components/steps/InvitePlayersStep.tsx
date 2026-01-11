@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Search, Users, Clock, Code, Check, Loader2 } from "lucide-react";
-import type { Problem, Profile } from "../../../../../../types/database";
+import type { Problem, Profile } from "../../../../../../../types/database";
 
 type InvitePlayersStepProps = {
 	selectedProblem: Problem | null;

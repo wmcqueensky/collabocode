@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor as MonacoEditorType } from "monaco-editor";
 import {
-	CollaborationDocument,
+	type CollaborationDocument,
 	type UserAwareness,
 } from "../../../services/yjs/collaborationDocument";
 import { MonacoYjsBinding } from "../../../services/yjs/monacoYjsBinding";

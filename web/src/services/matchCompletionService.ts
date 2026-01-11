@@ -50,6 +50,54 @@ export const matchCompletionService = {
 	},
 
 	/**
+	 * Check if all participants have fully submitted (for collaboration, check final_submission flag)
+	 */
+	async checkAllSubmittedForSession(
+		sessionId: string,
+		sessionType: SessionType
+	): Promise<boolean> {
+		const { data: participants, error } = await supabase
+			.from("session_participants")
+			.select("user_id, submission_time, test_results, status")
+			.eq("session_id", sessionId)
+			.eq("status", "joined");
+
+		if (error || !participants) {
+			console.error("Error checking submissions:", error);
+			return false;
+		}
+
+		if (participants.length === 0) {
+			return false;
+		}
+
+		// For collaboration sessions, check for final_submission flag
+		if (sessionType === "collaboration") {
+			const allFinalSubmitted = participants.every((p) => {
+				const testResults = p.test_results as any;
+				return testResults?.final_submission === true;
+			});
+
+			console.log(
+				`📊 Collaboration submission check: ${
+					participants.filter((p) => (p.test_results as any)?.final_submission)
+						.length
+				}/${participants.length} final submissions`
+			);
+			return allFinalSubmitted;
+		}
+
+		// For match sessions, check submission_time (original behavior)
+		const allSubmitted = participants.every((p) => p.submission_time !== null);
+		console.log(
+			`📊 Match submission check: ${
+				participants.filter((p) => p.submission_time).length
+			}/${participants.length} submissions`
+		);
+		return allSubmitted;
+	},
+
+	/**
 	 * Check if all participants have submitted and finalize session
 	 */
 	async checkAndFinalizeSession(sessionId: string): Promise<boolean> {
@@ -87,10 +135,14 @@ export const matchCompletionService = {
 			}
 
 			// Step 2: Check if all participants have submitted
-			const allSubmitted = await matchService.checkAllSubmitted(sessionId);
+			// Use session-type-aware check
+			const allSubmitted = await this.checkAllSubmittedForSession(
+				sessionId,
+				sessionType
+			);
 
 			if (!allSubmitted) {
-				console.log("⏳ Not all participants have submitted yet");
+				console.log("⏳ Not all participants have fully submitted yet");
 				return false;
 			}
 
@@ -211,7 +263,7 @@ export const matchCompletionService = {
 	): Promise<void> {
 		console.log("🤝 Finalizing collaboration session...");
 
-		// Get all participants
+		// Get all participants with their final submission data
 		const { data: participants, error: participantsError } = await supabase
 			.from("session_participants")
 			.select(
@@ -221,6 +273,7 @@ export const matchCompletionService = {
 				is_correct,
 				submission_time,
 				test_results,
+				code_snapshot,
 				user:profiles(collaboration_rating, collaboration_solved)
 			`
 			)
@@ -230,6 +283,17 @@ export const matchCompletionService = {
 		if (participantsError || !participants) {
 			throw new Error("Failed to get participants for collaboration");
 		}
+
+		// Log the state for debugging
+		console.log(
+			"📊 Participants data:",
+			participants.map((p) => ({
+				user_id: p.user_id,
+				is_correct: p.is_correct,
+				has_code: !!p.code_snapshot,
+				test_results: p.test_results,
+			}))
+		);
 
 		// Determine if the team succeeded (any participant got it correct - they share code)
 		const teamSuccess = participants.some((p) => p.is_correct);
@@ -498,12 +562,22 @@ export const matchCompletionService = {
 				async (payload) => {
 					const participant = payload.new as any;
 					const oldParticipant = payload.old as any;
+					const testResults = participant.test_results as any;
+					const oldTestResults = oldParticipant?.test_results as any;
 
-					// Only process if submission_time was just set
-					if (participant.submission_time && !oldParticipant.submission_time) {
+					// For collaboration: trigger when final_submission becomes true
+					// For match: trigger when submission_time is set
+					const isFinalSubmission =
+						testResults?.final_submission === true &&
+						oldTestResults?.final_submission !== true;
+					const isNewSubmission =
+						participant.submission_time && !oldParticipant?.submission_time;
+
+					if (isFinalSubmission || isNewSubmission) {
 						console.log(
-							"📊 Detected new submission for session:",
-							participant.session_id
+							"📊 Detected submission for session:",
+							participant.session_id,
+							isFinalSubmission ? "(final)" : "(new)"
 						);
 
 						// Add delay to let other updates settle
@@ -549,8 +623,17 @@ export const matchCompletionService = {
 				async (payload) => {
 					const participant = payload.new as any;
 					const oldParticipant = payload.old as any;
+					const testResults = participant.test_results as any;
+					const oldTestResults = oldParticipant?.test_results as any;
 
-					if (participant.submission_time && !oldParticipant.submission_time) {
+					// Trigger on final_submission or submission_time change
+					const isFinalSubmission =
+						testResults?.final_submission === true &&
+						oldTestResults?.final_submission !== true;
+					const isNewSubmission =
+						participant.submission_time && !oldParticipant?.submission_time;
+
+					if (isFinalSubmission || isNewSubmission) {
 						console.log(
 							"📊 Participant submitted, checking if session complete"
 						);
