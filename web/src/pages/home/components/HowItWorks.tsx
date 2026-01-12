@@ -15,7 +15,7 @@ const HowItWorks = () => {
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-					{/* Challenge Mode - Teal */}
+					{/* Duel Mode - Teal */}
 					<div className="group relative bg-[#1f1f1f] rounded-2xl p-8 border border-gray-700 hover:border-[#5bc6ca]/50 transition-all duration-300">
 						{/* Glow effect on hover */}
 						<div className="absolute inset-0 bg-[#5bc6ca]/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -26,23 +26,23 @@ const HowItWorks = () => {
 							</div>
 
 							<h3 className="text-2xl font-bold text-[#5bc6ca] mb-4">
-								Challenge Mode
+								Duel Mode
 							</h3>
 
 							<p className="text-gray-400 mb-6 leading-relaxed">
-								Join your group, solve curated problems together, race against a
-								timer, and compare solutions afterward. Great for interview
-								prep, teaching, and daily practice.
+								Compete head-to-head against other developers by solving Data
+								Structures and Algorithms problems. Race against the clock and
+								prove your skills in real-time competitive coding battles.
 							</p>
 
 							<ul className="space-y-3 text-sm text-gray-300">
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#5bc6ca] mr-3" />
-									Timed competitive sessions
+									Head-to-head competition
 								</li>
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#5bc6ca] mr-3" />
-									LeetCode-style problems
+									DSA problem challenges
 								</li>
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#5bc6ca] mr-3" />
@@ -56,13 +56,13 @@ const HowItWorks = () => {
 
 							<a href="/explore" className="inline-block mt-6">
 								<button className="px-5 py-2.5 bg-[#5bc6ca] text-black font-medium rounded-lg hover:bg-[#48aeb3] transition">
-									Start Challenge →
+									Start Duel →
 								</button>
 							</a>
 						</div>
 					</div>
 
-					{/* Codebase Mode - Violet */}
+					{/* Collabo Mode - Violet */}
 					<div className="group relative bg-[#1f1f1f] rounded-2xl p-8 border border-gray-700 hover:border-[#8b5cf6]/50 transition-all duration-300">
 						{/* Glow effect on hover */}
 						<div className="absolute inset-0 bg-[#8b5cf6]/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -73,13 +73,13 @@ const HowItWorks = () => {
 							</div>
 
 							<h3 className="text-2xl font-bold text-[#a78bfa] mb-4">
-								Codebase Mode
+								Collabo Mode
 							</h3>
 
 							<p className="text-gray-400 mb-6 leading-relaxed">
-								Collaborate on full-stack applications, toy projects, or
-								hackathon ideas. Shared file tree, versioning, and live cursors
-								give you the feeling of working side-by-side.
+								Work together with your team in real time to solve a shared DSA
+								problem. Collaborate on solutions, share ideas, and learn from
+								each other as you code side-by-side.
 							</p>
 
 							<ul className="space-y-3 text-sm text-gray-300">
@@ -89,7 +89,7 @@ const HowItWorks = () => {
 								</li>
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6] mr-3" />
-									Multi-file projects
+									Shared DSA problem solving
 								</li>
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6] mr-3" />
@@ -97,13 +97,13 @@ const HowItWorks = () => {
 								</li>
 								<li className="flex items-center">
 									<span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6] mr-3" />
-									Team problem-solving
+									Team learning experience
 								</li>
 							</ul>
 
 							<a href="/explore" className="inline-block mt-6">
 								<button className="px-5 py-2.5 bg-[#8b5cf6] text-white font-medium rounded-lg hover:bg-[#7c3aed] transition">
-									Start Collaboration →
+									Start Collabo →
 								</button>
 							</a>
 						</div>
