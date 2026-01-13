@@ -21,6 +21,7 @@ import {
 	Target,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
+import Editor from "@monaco-editor/react";
 import { sessionService } from "../../services/sessionService";
 import { codeAnalyzerService } from "../../services/codeAnalyzerService";
 import { supabase } from "../../lib/supabase";
@@ -54,6 +55,13 @@ interface PercentileData {
 	slowestSolveTime: number;
 }
 
+interface HistoricalSolution {
+	solveTime: number;
+	timeComplexity: string;
+	spaceComplexity: string;
+	complexityScore: number;
+}
+
 interface TeamEvaluation {
 	overallScore: number;
 	correctness: number;
@@ -76,6 +84,21 @@ interface HistoricalStats {
 	averageCorrectness: number;
 }
 
+interface DistributionData {
+	timeDistribution: { range: string; count: number; isYours: boolean }[];
+	complexityDistribution: {
+		complexity: string;
+		count: number;
+		isYours: boolean;
+	}[];
+	spaceComplexityDistribution: {
+		complexity: string;
+		count: number;
+		isYours: boolean;
+	}[];
+	historicalSolutions: HistoricalSolution[];
+}
+
 export default function CollaborationSummaryPage() {
 	const { sessionId } = useParams<{ sessionId: string }>();
 	const navigate = useNavigate();
@@ -90,6 +113,8 @@ export default function CollaborationSummaryPage() {
 	const [currentUserId, setCurrentUserId] = useState<string>("");
 	const [historicalStats, setHistoricalStats] =
 		useState<HistoricalStats | null>(null);
+	const [distributionData, setDistributionData] =
+		useState<DistributionData | null>(null);
 
 	useEffect(() => {
 		const loadUser = async () => {
@@ -209,11 +234,166 @@ export default function CollaborationSummaryPage() {
 				stats
 			);
 			setTeamEvaluation(evaluation);
+
+			// Load distribution data for comparison charts
+			const distribution = await loadDistributionData(
+				sessionData.problem_id,
+				sessionData.max_players,
+				sessionData.time_limit,
+				evaluation.solveTimeSeconds,
+				evaluation.complexity,
+				sessionData.language
+			);
+			setDistributionData(distribution);
 		} catch (err: any) {
 			console.error("Error loading collaboration summary:", err);
 			setError("Failed to load collaboration summary");
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	// Load distribution data for comparison charts
+	const loadDistributionData = async (
+		problemId: string,
+		maxPlayers: number,
+		timeLimit: number,
+		currentSolveTime: number,
+		currentComplexity: ComplexityAnalysis,
+		language: string
+	): Promise<DistributionData | null> => {
+		try {
+			const { data: historicalSessions, error } = await supabase
+				.from("sessions")
+				.select(
+					`
+					id,
+					started_at,
+					language,
+					session_participants!inner(
+						submission_time,
+						code_snapshot,
+						is_correct
+					)
+				`
+				)
+				.eq("problem_id", problemId)
+				.eq("type", "collaboration")
+				.eq("status", "completed")
+				.gte("max_players", maxPlayers - 1)
+				.lte("max_players", maxPlayers + 1)
+				.neq("id", sessionId);
+
+			if (error || !historicalSessions) {
+				return null;
+			}
+
+			const historicalSolutions: HistoricalSolution[] = [];
+
+			for (const session of historicalSessions) {
+				const participants = session.session_participants as any[];
+				if (!participants || participants.length === 0) continue;
+
+				const wasSuccessful = participants.some((p: any) => p.is_correct);
+				if (!wasSuccessful) continue;
+
+				const startTime = session.started_at
+					? new Date(session.started_at).getTime()
+					: 0;
+				const submissions = participants
+					.filter((p: any) => p.submission_time)
+					.map((p: any) => new Date(p.submission_time).getTime());
+
+				if (submissions.length === 0 || startTime === 0) continue;
+
+				const sessionSolveTime = Math.floor(
+					(Math.min(...submissions) - startTime) / 1000
+				);
+
+				const firstSubmitter = participants.find((p: any) => p.code_snapshot);
+				const historicalComplexity = codeAnalyzerService.analyzeComplexity(
+					firstSubmitter?.code_snapshot || "",
+					session.language || language
+				);
+
+				historicalSolutions.push({
+					solveTime: sessionSolveTime,
+					timeComplexity: historicalComplexity.timeComplexity,
+					spaceComplexity: historicalComplexity.spaceComplexity,
+					complexityScore: getComplexityScore(historicalComplexity),
+				});
+			}
+
+			// Create time distribution buckets
+			const timeRanges = [
+				{ min: 0, max: 60, label: "0-1m" },
+				{ min: 60, max: 120, label: "1-2m" },
+				{ min: 120, max: 180, label: "2-3m" },
+				{ min: 180, max: 300, label: "3-5m" },
+				{ min: 300, max: 600, label: "5-10m" },
+				{ min: 600, max: 900, label: "10-15m" },
+				{ min: 900, max: 1800, label: "15-30m" },
+				{ min: 1800, max: Infinity, label: "30m+" },
+			];
+
+			const timeDistribution = timeRanges.map((range) => {
+				const count = historicalSolutions.filter(
+					(s) => s.solveTime >= range.min && s.solveTime < range.max
+				).length;
+				const isYours =
+					currentSolveTime >= range.min && currentSolveTime < range.max;
+				return { range: range.label, count, isYours };
+			});
+
+			// Create time complexity distribution
+			const timeComplexityTypes = [
+				"O(1)",
+				"O(log n)",
+				"O(n)",
+				"O(n log n)",
+				"O(n²)",
+				"O(n³)",
+				"O(2^n)",
+				"N/A",
+			];
+			const complexityDistribution = timeComplexityTypes
+				.map((complexity) => {
+					const count = historicalSolutions.filter(
+						(s) => s.timeComplexity === complexity
+					).length;
+					const isYours = currentComplexity.timeComplexity === complexity;
+					return { complexity, count, isYours };
+				})
+				.filter((d) => d.count > 0 || d.isYours);
+
+			// Create space complexity distribution
+			const spaceComplexityTypes = [
+				"O(1)",
+				"O(log n)",
+				"O(n)",
+				"O(n²)",
+				"O(2^n)",
+				"N/A",
+			];
+			const spaceComplexityDistribution = spaceComplexityTypes
+				.map((complexity) => {
+					const count = historicalSolutions.filter(
+						(s) => s.spaceComplexity === complexity
+					).length;
+					const isYours = currentComplexity.spaceComplexity === complexity;
+					return { complexity, count, isYours };
+				})
+				.filter((d) => d.count > 0 || d.isYours);
+
+			return {
+				timeDistribution,
+				complexityDistribution,
+				spaceComplexityDistribution,
+				historicalSolutions,
+			};
+		} catch (err) {
+			console.error("Error loading distribution data:", err);
+			return null;
 		}
 	};
 
@@ -224,7 +404,6 @@ export default function CollaborationSummaryPage() {
 		timeLimit: number
 	): Promise<HistoricalStats | null> => {
 		try {
-			// Get all completed collaboration sessions for the same problem with similar settings
 			const { data: historicalSessions, error } = await supabase
 				.from("sessions")
 				.select(
@@ -244,7 +423,7 @@ export default function CollaborationSummaryPage() {
 				.eq("problem_id", problemId)
 				.eq("type", "collaboration")
 				.eq("status", "completed")
-				.neq("id", sessionId); // Exclude current session
+				.neq("id", sessionId);
 
 			if (error || !historicalSessions) {
 				return null;
@@ -268,11 +447,9 @@ export default function CollaborationSummaryPage() {
 				const participants = session.session_participants as any[];
 				if (!participants || participants.length === 0) continue;
 
-				// Check if successful
 				const wasSuccessful = participants.some((p: any) => p.is_correct);
 				if (wasSuccessful) successfulCount++;
 
-				// Calculate solve time
 				if (session.started_at) {
 					const startTime = new Date(session.started_at).getTime();
 					const firstSubmission = participants
@@ -294,7 +471,6 @@ export default function CollaborationSummaryPage() {
 					}
 				}
 
-				// Calculate correctness (average test pass rate)
 				let sessionCorrectness = 0;
 				let participantCount = 0;
 				for (const p of participants) {
@@ -336,7 +512,6 @@ export default function CollaborationSummaryPage() {
 		code: string,
 		stats: HistoricalStats | null
 	): Promise<TeamEvaluation> => {
-		// Calculate correctness from actual test results
 		let totalPassed = 0;
 		let totalTests = 0;
 		participants.forEach((p) => {
@@ -345,16 +520,13 @@ export default function CollaborationSummaryPage() {
 			totalTests += results.totalCount || 0;
 		});
 
-		// For collaboration, check if ANY participant got it correct (they share code)
 		const isCorrect = participants.some((p) => p.is_correct);
 
-		// Calculate correctness as percentage of tests passed
 		const correctness =
 			totalTests > 0
 				? Math.round(((totalPassed / totalTests) * 100) / participants.length)
 				: 0;
 
-		// Calculate solve time from actual timestamps
 		const startTime = session.started_at
 			? new Date(session.started_at).getTime()
 			: 0;
@@ -367,13 +539,11 @@ export default function CollaborationSummaryPage() {
 		const solveTimeSeconds =
 			startTime > 0 ? Math.floor((firstSubmissionTime - startTime) / 1000) : 0;
 
-		// Analyze code complexity using the analyzer service
 		const complexity = codeAnalyzerService.analyzeComplexity(
 			code,
 			session.language
 		);
 
-		// Calculate percentiles by comparing with historical data
 		const percentiles = await calculatePercentiles(
 			session.problem_id,
 			session.max_players,
@@ -383,16 +553,10 @@ export default function CollaborationSummaryPage() {
 			session.language
 		);
 
-		// Calculate efficiency score from complexity (derived from analyzer)
 		const efficiency = calculateEfficiencyScore(complexity);
-
-		// Calculate code quality from actual code analysis
 		const codeQuality = calculateCodeQualityScore(code, session.language);
-
-		// Calculate collaboration score from actual participation data
 		const collaboration = calculateCollaborationScore(participants, session);
 
-		// Calculate overall score (weighted by actual metrics)
 		const overallScore = calculateOverallScore(
 			correctness,
 			efficiency,
@@ -401,7 +565,6 @@ export default function CollaborationSummaryPage() {
 			isCorrect
 		);
 
-		// Generate dynamic feedback based on actual data
 		const feedback = generateDynamicFeedback(
 			correctness,
 			efficiency,
@@ -459,8 +622,6 @@ export default function CollaborationSummaryPage() {
 		language: string
 	): Promise<PercentileData | null> => {
 		try {
-			// Get all completed collaboration sessions for comparison
-			// Filter by same problem, similar player count (±1), similar time limit (±15 min)
 			const { data: historicalSessions, error } = await supabase
 				.from("sessions")
 				.select(
@@ -488,7 +649,6 @@ export default function CollaborationSummaryPage() {
 				return null;
 			}
 
-			// Calculate metrics for each historical session
 			const historicalMetrics: Array<{
 				solveTime: number;
 				complexityScore: number;
@@ -498,11 +658,9 @@ export default function CollaborationSummaryPage() {
 				const participants = session.session_participants as any[];
 				if (!participants || participants.length === 0) continue;
 
-				// Only include successful collaborations for fair comparison
 				const wasSuccessful = participants.some((p: any) => p.is_correct);
 				if (!wasSuccessful) continue;
 
-				// Calculate solve time
 				const startTime = session.started_at
 					? new Date(session.started_at).getTime()
 					: 0;
@@ -516,7 +674,6 @@ export default function CollaborationSummaryPage() {
 					(Math.min(...submissions) - startTime) / 1000
 				);
 
-				// Analyze complexity of historical solution
 				const firstSubmitter = participants.find((p: any) => p.code_snapshot);
 				const historicalComplexity = codeAnalyzerService.analyzeComplexity(
 					firstSubmitter?.code_snapshot || "",
@@ -533,10 +690,8 @@ export default function CollaborationSummaryPage() {
 				return null;
 			}
 
-			// Calculate current complexity score
 			const currentComplexityScore = getComplexityScore(complexity);
 
-			// Time percentile (lower solve time is better, so count how many were slower)
 			const fasterThan = historicalMetrics.filter(
 				(m) => m.solveTime > solveTimeSeconds
 			).length;
@@ -544,7 +699,6 @@ export default function CollaborationSummaryPage() {
 				(fasterThan / historicalMetrics.length) * 100
 			);
 
-			// Complexity percentile (higher score is better)
 			const betterComplexityThan = historicalMetrics.filter(
 				(m) => m.complexityScore < currentComplexityScore
 			).length;
@@ -552,7 +706,6 @@ export default function CollaborationSummaryPage() {
 				(betterComplexityThan / historicalMetrics.length) * 100
 			);
 
-			// Calculate additional stats
 			const solveTimes = historicalMetrics.map((m) => m.solveTime);
 			const averageSolveTime = Math.round(
 				solveTimes.reduce((a, b) => a + b, 0) / solveTimes.length
@@ -602,14 +755,13 @@ export default function CollaborationSummaryPage() {
 		const timeScore = timeScores[complexity.timeComplexity] || 50;
 		const spaceScore = spaceScores[complexity.spaceComplexity] || 50;
 
-		// Weight time complexity more heavily (70/30 split)
 		return Math.round(timeScore * 0.7 + spaceScore * 0.3);
 	};
 
 	// Calculate efficiency score from complexity analysis
 	const calculateEfficiencyScore = (complexity: ComplexityAnalysis): number => {
 		if (complexity.confidence === "none") {
-			return 50; // Neutral score when we can't analyze
+			return 50;
 		}
 		return getComplexityScore(complexity);
 	};
@@ -621,18 +773,16 @@ export default function CollaborationSummaryPage() {
 	): number => {
 		if (!code || code.trim().length === 0) return 0;
 
-		let score = 50; // Start neutral
+		let score = 50;
 		const lines = code.split("\n");
 		const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
 
-		// Check for comments (language-aware)
 		const hasComments =
 			language === "python"
 				? code.includes("#") || code.includes('"""') || code.includes("'''")
 				: code.includes("//") || code.includes("/*");
 		if (hasComments) score += 15;
 
-		// Check for meaningful variable names (average length > 3 chars)
 		const varPattern =
 			language === "python"
 				? /(?:^|\s)(\w+)\s*=/gm
@@ -646,16 +796,13 @@ export default function CollaborationSummaryPage() {
 			else if (avgLength > 3) score += 8;
 		}
 
-		// Check for proper indentation
 		const hasIndentation = nonEmptyLines.some(
 			(l) => l.startsWith("  ") || l.startsWith("\t")
 		);
 		if (hasIndentation) score += 10;
 
-		// Check for reasonable line count (not too short, not too long)
 		if (nonEmptyLines.length >= 5 && nonEmptyLines.length <= 100) score += 5;
 
-		// Check for function/method definitions
 		const hasFunctions =
 			language === "python"
 				? /def\s+\w+\s*\(/.test(code)
@@ -675,12 +822,10 @@ export default function CollaborationSummaryPage() {
 		let score = 0;
 		const totalParticipants = participants.length;
 
-		// Factor 1: Submission rate (did everyone submit?)
 		const submittedCount = participants.filter((p) => p.submission_time).length;
 		const submissionRate = submittedCount / totalParticipants;
-		score += submissionRate * 40; // Up to 40 points
+		score += submissionRate * 40;
 
-		// Factor 2: Submission timing spread (did they work together or one person carry?)
 		const submissions = participants
 			.filter((p) => p.submission_time)
 			.map((p) => new Date(p.submission_time).getTime());
@@ -691,18 +836,16 @@ export default function CollaborationSummaryPage() {
 			const spreadMs = maxTime - minTime;
 			const spreadMinutes = spreadMs / (1000 * 60);
 
-			// Tight spread (< 5 min) suggests good coordination
 			if (spreadMinutes < 5) score += 30;
 			else if (spreadMinutes < 15) score += 20;
 			else if (spreadMinutes < 30) score += 10;
 		} else if (submissions.length === 1) {
-			score += 15; // Single person, some credit
+			score += 15;
 		}
 
-		// Factor 3: Team size utilization
 		const expectedPlayers = session.max_players || 2;
 		const utilizationRate = totalParticipants / expectedPlayers;
-		score += utilizationRate * 30; // Up to 30 points
+		score += utilizationRate * 30;
 
 		return Math.min(100, Math.max(0, Math.round(score)));
 	};
@@ -715,8 +858,6 @@ export default function CollaborationSummaryPage() {
 		collaboration: number,
 		isCorrect: boolean
 	): number => {
-		// If the solution is correct, weight correctness higher
-		// If incorrect, weight it lower to show room for improvement
 		const correctnessWeight = isCorrect ? 0.4 : 0.5;
 		const efficiencyWeight = isCorrect ? 0.25 : 0.15;
 		const qualityWeight = 0.15;
@@ -743,7 +884,6 @@ export default function CollaborationSummaryPage() {
 	): string[] => {
 		const feedback: string[] = [];
 
-		// Correctness feedback
 		if (isCorrect) {
 			feedback.push("Your team successfully solved the problem!");
 		} else if (correctness >= 80) {
@@ -760,14 +900,12 @@ export default function CollaborationSummaryPage() {
 			);
 		}
 
-		// Complexity feedback
 		if (complexity.confidence !== "none") {
 			feedback.push(
 				`Your solution has ${complexity.timeComplexity} time complexity and ${complexity.spaceComplexity} space complexity.`
 			);
 		}
 
-		// Percentile feedback
 		if (percentiles) {
 			if (percentiles.timePercentile >= 75) {
 				feedback.push(
@@ -780,7 +918,6 @@ export default function CollaborationSummaryPage() {
 			}
 		}
 
-		// Historical comparison
 		if (stats && stats.totalCollaborations > 0) {
 			feedback.push(
 				`This problem has been attempted by ${
@@ -927,19 +1064,24 @@ export default function CollaborationSummaryPage() {
 		return `${mins}m ${secs}s`;
 	};
 
-	// Score color helpers
-	const getScoreColor = (score: number): string => {
-		if (score >= 80) return "text-green-400";
-		if (score >= 60) return "text-yellow-400";
-		if (score >= 40) return "text-orange-400";
-		return "text-red-400";
-	};
-
-	const getScoreBgColor = (score: number): string => {
-		if (score >= 80) return "bg-green-500/20";
-		if (score >= 60) return "bg-yellow-500/20";
-		if (score >= 40) return "bg-orange-500/20";
-		return "bg-red-500/20";
+	// Get Monaco language from session language
+	const getMonacoLanguage = (language: string): string => {
+		const languageMap: Record<string, string> = {
+			javascript: "javascript",
+			typescript: "typescript",
+			python: "python",
+			java: "java",
+			cpp: "cpp",
+			c: "c",
+			csharp: "csharp",
+			go: "go",
+			ruby: "ruby",
+			php: "php",
+			swift: "swift",
+			kotlin: "kotlin",
+			rust: "rust",
+		};
+		return languageMap[language?.toLowerCase()] || "javascript";
 	};
 
 	const getRatingChangeColor = (change: number): string => {
@@ -1111,62 +1253,384 @@ export default function CollaborationSummaryPage() {
 					</div>
 				</div>
 
-				{/* Percentile Comparison */}
-				{teamEvaluation.percentiles && (
-					<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
-						<h3 className="text-xl font-semibold mb-4 flex items-center">
-							<Target className="mr-2 text-purple-500" size={20} />
-							Compared to Other Teams
-						</h3>
-						<p className="text-sm text-gray-400 mb-4">
-							Based on {teamEvaluation.percentiles.totalComparisons} successful
-							collaborations with similar settings
-						</p>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div className="p-4 bg-[#1f1f1f] rounded-lg">
-								<div className="flex items-center justify-between mb-2">
-									<span className="text-gray-400">Runtime</span>
-									<span className="text-green-400 font-bold">
-										Beats {teamEvaluation.percentiles.timePercentile}%
-									</span>
-								</div>
-								<div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-									<div
-										className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-1000"
-										style={{
-											width: `${teamEvaluation.percentiles.timePercentile}%`,
-										}}
-									/>
-								</div>
-								<p className="text-xs text-gray-500 mt-2">
-									Faster than {teamEvaluation.percentiles.fasterThan} of{" "}
-									{teamEvaluation.percentiles.totalComparisons} teams
+				{/* Solution Comparison Charts - LeetCode Style */}
+				{distributionData &&
+					(distributionData.timeDistribution.some((d) => d.count > 0) ||
+						distributionData.complexityDistribution.some(
+							(d) => d.count > 0
+						)) && (
+						<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
+							<h3 className="text-xl font-semibold mb-4 flex items-center">
+								<Target className="mr-2 text-purple-500" size={20} />
+								How You Compare to Other Teams
+							</h3>
+
+							{teamEvaluation.percentiles && (
+								<p className="text-sm text-gray-400 mb-6">
+									Compared against {teamEvaluation.percentiles.totalComparisons}{" "}
+									successful collaboration
+									{teamEvaluation.percentiles.totalComparisons !== 1
+										? "s"
+										: ""}{" "}
+									on this problem
 								</p>
+							)}
+
+							{/* Runtime Distribution Chart */}
+							<div className="bg-[#1f1f1f] rounded-lg p-4 mb-4">
+								<div className="flex items-center justify-between mb-4">
+									<h4 className="text-sm font-medium text-gray-300 flex items-center">
+										<Timer size={16} className="mr-2 text-green-400" />
+										Runtime Distribution
+									</h4>
+									{teamEvaluation.percentiles && (
+										<span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full">
+											Beats {teamEvaluation.percentiles.timePercentile}%
+										</span>
+									)}
+								</div>
+
+								<div className="space-y-2">
+									{distributionData.timeDistribution.map((bucket, idx) => {
+										const maxCount = Math.max(
+											...distributionData.timeDistribution.map((d) => d.count),
+											1
+										);
+										const width =
+											bucket.count > 0
+												? Math.max((bucket.count / maxCount) * 100, 8)
+												: 0;
+
+										return (
+											<div key={idx} className="flex items-center gap-2">
+												<span className="text-xs text-gray-500 w-16 text-right font-mono">
+													{bucket.range}
+												</span>
+												<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+													<div
+														className={`h-full rounded transition-all duration-500 ${
+															bucket.isYours
+																? "bg-gradient-to-r from-green-500 to-green-400"
+																: "bg-gray-600"
+														}`}
+														style={{ width: `${width}%` }}
+													/>
+													{bucket.isYours && (
+														<div className="absolute inset-0 flex items-center justify-end pr-2">
+															<span className="text-xs font-bold text-white drop-shadow-lg">
+																You
+															</span>
+														</div>
+													)}
+												</div>
+												<span className="text-xs text-gray-500 w-8 font-mono">
+													{bucket.count}
+												</span>
+											</div>
+										);
+									})}
+								</div>
+
+								<div className="mt-4 pt-3 border-t border-gray-700">
+									<div className="flex justify-between text-xs text-gray-500">
+										<span>
+											Your time:{" "}
+											<span className="text-green-400 font-medium">
+												{formatTime(teamEvaluation.solveTimeSeconds)}
+											</span>
+										</span>
+										{teamEvaluation.percentiles && (
+											<span>
+												Avg:{" "}
+												{formatTime(
+													teamEvaluation.percentiles.averageSolveTime
+												)}
+											</span>
+										)}
+									</div>
+								</div>
 							</div>
 
-							<div className="p-4 bg-[#1f1f1f] rounded-lg">
-								<div className="flex items-center justify-between mb-2">
-									<span className="text-gray-400">Complexity</span>
-									<span className="text-blue-400 font-bold">
-										Beats {teamEvaluation.percentiles.complexityPercentile}%
-									</span>
+							{/* Time & Space Complexity Charts */}
+							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+								{/* Time Complexity Distribution Chart */}
+								<div className="bg-[#1f1f1f] rounded-lg p-4">
+									<div className="flex items-center justify-between mb-4">
+										<h4 className="text-sm font-medium text-gray-300 flex items-center">
+											<Zap size={16} className="mr-2 text-blue-400" />
+											Time Complexity Distribution
+										</h4>
+										{teamEvaluation.percentiles && (
+											<span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full">
+												Beats {teamEvaluation.percentiles.complexityPercentile}%
+											</span>
+										)}
+									</div>
+
+									<div className="space-y-2">
+										{distributionData.complexityDistribution.map(
+											(bucket, idx) => {
+												const maxCount = Math.max(
+													...distributionData.complexityDistribution.map(
+														(d) => d.count
+													),
+													1
+												);
+												const width =
+													bucket.count > 0
+														? Math.max((bucket.count / maxCount) * 100, 8)
+														: 0;
+
+												return (
+													<div key={idx} className="flex items-center gap-2">
+														<span className="text-xs text-gray-500 w-20 text-right font-mono">
+															{bucket.complexity}
+														</span>
+														<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+															<div
+																className={`h-full rounded transition-all duration-500 ${
+																	bucket.isYours
+																		? "bg-gradient-to-r from-blue-500 to-blue-400"
+																		: "bg-gray-600"
+																}`}
+																style={{ width: `${width}%` }}
+															/>
+															{bucket.isYours && (
+																<div className="absolute inset-0 flex items-center justify-end pr-2">
+																	<span className="text-xs font-bold text-white drop-shadow-lg">
+																		You
+																	</span>
+																</div>
+															)}
+														</div>
+														<span className="text-xs text-gray-500 w-8 font-mono">
+															{bucket.count}
+														</span>
+													</div>
+												);
+											}
+										)}
+									</div>
+
+									<div className="mt-4 pt-3 border-t border-gray-700">
+										<div className="text-xs text-gray-500">
+											Your complexity:{" "}
+											<span className="text-blue-400 font-medium">
+												{teamEvaluation.complexity.timeComplexity}
+											</span>
+										</div>
+									</div>
 								</div>
-								<div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-									<div
-										className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-1000"
-										style={{
-											width: `${teamEvaluation.percentiles.complexityPercentile}%`,
-										}}
-									/>
+
+								{/* Space Complexity Distribution Chart */}
+								<div className="bg-[#1f1f1f] rounded-lg p-4">
+									<div className="flex items-center justify-between mb-4">
+										<h4 className="text-sm font-medium text-gray-300 flex items-center">
+											<BarChart3 size={16} className="mr-2 text-yellow-400" />
+											Space Complexity Distribution
+										</h4>
+									</div>
+
+									<div className="space-y-2">
+										{distributionData.spaceComplexityDistribution.map(
+											(bucket, idx) => {
+												const maxCount = Math.max(
+													...distributionData.spaceComplexityDistribution.map(
+														(d) => d.count
+													),
+													1
+												);
+												const width =
+													bucket.count > 0
+														? Math.max((bucket.count / maxCount) * 100, 8)
+														: 0;
+
+												return (
+													<div key={idx} className="flex items-center gap-2">
+														<span className="text-xs text-gray-500 w-20 text-right font-mono">
+															{bucket.complexity}
+														</span>
+														<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+															<div
+																className={`h-full rounded transition-all duration-500 ${
+																	bucket.isYours
+																		? "bg-gradient-to-r from-yellow-500 to-yellow-400"
+																		: "bg-gray-600"
+																}`}
+																style={{ width: `${width}%` }}
+															/>
+															{bucket.isYours && (
+																<div className="absolute inset-0 flex items-center justify-end pr-2">
+																	<span className="text-xs font-bold text-white drop-shadow-lg">
+																		You
+																	</span>
+																</div>
+															)}
+														</div>
+														<span className="text-xs text-gray-500 w-8 font-mono">
+															{bucket.count}
+														</span>
+													</div>
+												);
+											}
+										)}
+									</div>
+
+									<div className="mt-4 pt-3 border-t border-gray-700">
+										<div className="text-xs text-gray-500">
+											Your complexity:{" "}
+											<span className="text-yellow-400 font-medium">
+												{teamEvaluation.complexity.spaceComplexity}
+											</span>
+										</div>
+									</div>
 								</div>
-								<p className="text-xs text-gray-500 mt-2">
-									Better than {teamEvaluation.percentiles.betterComplexityThan}{" "}
-									of {teamEvaluation.percentiles.totalComparisons} teams
-								</p>
 							</div>
+
+							{/* Percentile Summary with Legends */}
+							{teamEvaluation.percentiles && (
+								<div className="bg-[#1f1f1f] rounded-lg p-4">
+									<h4 className="text-sm font-medium text-gray-300 mb-4">
+										Performance Summary
+									</h4>
+
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+										<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
+											<div className="text-2xl font-bold text-green-400">
+												{teamEvaluation.percentiles.timePercentile}%
+											</div>
+											<div className="text-xs text-gray-500">
+												Runtime Percentile
+											</div>
+										</div>
+										<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
+											<div className="text-2xl font-bold text-blue-400">
+												{teamEvaluation.percentiles.complexityPercentile}%
+											</div>
+											<div className="text-xs text-gray-500">
+												Complexity Percentile
+											</div>
+										</div>
+										<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
+											<div className="text-2xl font-bold text-purple-400">
+												{formatTime(
+													teamEvaluation.percentiles.fastestSolveTime
+												)}
+											</div>
+											<div className="text-xs text-gray-500">
+												Fastest Solution
+											</div>
+										</div>
+										<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
+											<div className="text-2xl font-bold text-gray-400">
+												{teamEvaluation.percentiles.totalComparisons}
+											</div>
+											<div className="text-xs text-gray-500">
+												Total Solutions
+											</div>
+										</div>
+									</div>
+
+									{/* Legend Section */}
+									<div className="border-t border-gray-700 pt-4">
+										<h5 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3 flex items-center">
+											<Lightbulb size={12} className="mr-1" />
+											What These Metrics Mean
+										</h5>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+											<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
+												<div className="w-3 h-3 rounded-full bg-green-400 mt-0.5 flex-shrink-0" />
+												<div>
+													<span className="text-gray-300 font-medium">
+														Runtime Percentile
+													</span>
+													<p className="text-gray-500 mt-0.5">
+														The percentage of teams you solved faster than. A
+														higher percentage means you were quicker than more
+														teams.
+													</p>
+												</div>
+											</div>
+											<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
+												<div className="w-3 h-3 rounded-full bg-blue-400 mt-0.5 flex-shrink-0" />
+												<div>
+													<span className="text-gray-300 font-medium">
+														Complexity Percentile
+													</span>
+													<p className="text-gray-500 mt-0.5">
+														The percentage of teams whose solution had worse
+														time complexity than yours. Higher is better (more
+														efficient algorithm).
+													</p>
+												</div>
+											</div>
+											<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
+												<div className="w-3 h-3 rounded-full bg-blue-400 mt-0.5 flex-shrink-0" />
+												<div>
+													<span className="text-gray-300 font-medium">
+														Time Complexity
+													</span>
+													<p className="text-gray-500 mt-0.5">
+														How your algorithm's runtime scales with input size.
+														O(n) is linear, O(n²) is quadratic, O(log n) is
+														logarithmic. Lower is generally better.
+													</p>
+												</div>
+											</div>
+											<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
+												<div className="w-3 h-3 rounded-full bg-yellow-400 mt-0.5 flex-shrink-0" />
+												<div>
+													<span className="text-gray-300 font-medium">
+														Space Complexity
+													</span>
+													<p className="text-gray-500 mt-0.5">
+														How much memory your algorithm uses relative to
+														input size. O(1) means constant space, O(n) means
+														linear space usage.
+													</p>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									{/* Chart Legend */}
+									<div className="border-t border-gray-700 pt-4 mt-4">
+										<h5 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+											Chart Legend
+										</h5>
+										<div className="flex flex-wrap gap-4 text-xs">
+											<div className="flex items-center gap-2">
+												<div className="w-4 h-3 rounded bg-gradient-to-r from-green-500 to-green-400" />
+												<span className="text-gray-400">Your runtime</span>
+											</div>
+											<div className="flex items-center gap-2">
+												<div className="w-4 h-3 rounded bg-gradient-to-r from-blue-500 to-blue-400" />
+												<span className="text-gray-400">
+													Your time complexity
+												</span>
+											</div>
+											<div className="flex items-center gap-2">
+												<div className="w-4 h-3 rounded bg-gradient-to-r from-yellow-500 to-yellow-400" />
+												<span className="text-gray-400">
+													Your space complexity
+												</span>
+											</div>
+											<div className="flex items-center gap-2">
+												<div className="w-4 h-3 rounded bg-gray-600" />
+												<span className="text-gray-400">Other teams</span>
+											</div>
+											<div className="flex items-center gap-2">
+												<span className="text-gray-500 font-mono">#</span>
+												<span className="text-gray-400">
+													Number of solutions in that range
+												</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							)}
 						</div>
-					</div>
-				)}
+					)}
 
 				{/* Team Members with Rating Changes */}
 				<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
@@ -1227,83 +1691,6 @@ export default function CollaborationSummaryPage() {
 					</div>
 				</div>
 
-				{/* Team Evaluation Scores */}
-				<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
-					<h3 className="text-xl font-semibold mb-4 flex items-center">
-						<Award className="mr-2 text-purple-500" size={20} />
-						Team Evaluation
-					</h3>
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
-							<CheckCircle
-								className={`mx-auto mb-2 ${getScoreColor(
-									teamEvaluation.correctness
-								)}`}
-								size={24}
-							/>
-							<div
-								className={`text-2xl font-bold ${getScoreColor(
-									teamEvaluation.correctness
-								)}`}
-							>
-								{teamEvaluation.correctness}%
-							</div>
-							<div className="text-sm text-gray-400">Correctness</div>
-						</div>
-
-						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
-							<Zap
-								className={`mx-auto mb-2 ${getScoreColor(
-									teamEvaluation.efficiency
-								)}`}
-								size={24}
-							/>
-							<div
-								className={`text-2xl font-bold ${getScoreColor(
-									teamEvaluation.efficiency
-								)}`}
-							>
-								{teamEvaluation.efficiency}%
-							</div>
-							<div className="text-sm text-gray-400">Efficiency</div>
-						</div>
-
-						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
-							<Code
-								className={`mx-auto mb-2 ${getScoreColor(
-									teamEvaluation.codeQuality
-								)}`}
-								size={24}
-							/>
-							<div
-								className={`text-2xl font-bold ${getScoreColor(
-									teamEvaluation.codeQuality
-								)}`}
-							>
-								{teamEvaluation.codeQuality}%
-							</div>
-							<div className="text-sm text-gray-400">Code Quality</div>
-						</div>
-
-						<div className="text-center p-4 bg-[#1f1f1f] rounded-lg">
-							<Users
-								className={`mx-auto mb-2 ${getScoreColor(
-									teamEvaluation.collaboration
-								)}`}
-								size={24}
-							/>
-							<div
-								className={`text-2xl font-bold ${getScoreColor(
-									teamEvaluation.collaboration
-								)}`}
-							>
-								{teamEvaluation.collaboration}%
-							</div>
-							<div className="text-sm text-gray-400">Collaboration</div>
-						</div>
-					</div>
-				</div>
-
 				{/* Feedback Section */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 					<div className="bg-[#2c2c2c] rounded-lg p-6 border border-gray-700">
@@ -1358,20 +1745,57 @@ export default function CollaborationSummaryPage() {
 					</div>
 				</div>
 
-				{/* Code Preview */}
+				{/* Code Preview with Syntax Highlighting */}
 				{sharedCode && (
 					<div className="bg-[#2c2c2c] rounded-lg p-6 border border-gray-700">
 						<h3 className="text-lg font-semibold mb-4 flex items-center">
 							<Code className="mr-2 text-purple-500" size={20} />
 							Your Team's Solution
 						</h3>
-						<div className="bg-[#1e1e1e] rounded-lg p-4 overflow-x-auto">
-							<pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-								{sharedCode.slice(0, 2000)}
-								{sharedCode.length > 2000 && (
-									<span className="text-gray-500">... (truncated)</span>
-								)}
-							</pre>
+						<div className="rounded-lg overflow-hidden border border-gray-700">
+							<Editor
+								height="400px"
+								language={getMonacoLanguage(session.language)}
+								value={sharedCode}
+								theme="vs-dark"
+								options={{
+									readOnly: true,
+									fontSize: 14,
+									fontFamily: "Fira Code, Monaco, Menlo, Consolas, monospace",
+									minimap: { enabled: false },
+									lineNumbers: "on",
+									scrollBeyondLastLine: false,
+									wordWrap: "on",
+									folding: true,
+									renderWhitespace: "none",
+									padding: { top: 16, bottom: 16 },
+									scrollbar: {
+										vertical: "auto",
+										horizontal: "auto",
+										verticalScrollbarSize: 10,
+										horizontalScrollbarSize: 10,
+									},
+									overviewRulerLanes: 0,
+									hideCursorInOverviewRuler: true,
+									overviewRulerBorder: false,
+									contextmenu: false,
+									selectOnLineNumbers: false,
+									cursorStyle: "line",
+									cursorBlinking: "solid",
+								}}
+							/>
+						</div>
+						<div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+							<span className="flex items-center">
+								<Code size={12} className="mr-1" />
+								{session.language?.charAt(0).toUpperCase() +
+									session.language?.slice(1)}{" "}
+								• {sharedCode.split("\n").length} lines
+							</span>
+							<span>
+								{teamEvaluation.complexity.timeComplexity} time •{" "}
+								{teamEvaluation.complexity.spaceComplexity} space
+							</span>
 						</div>
 					</div>
 				)}

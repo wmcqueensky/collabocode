@@ -40,15 +40,15 @@ const Router = () => (
 				path={`${COLLABORATION_SUMMARY_PATH}/:sessionId`}
 				element={<CollaborationSummaryPage />}
 			/>
+			<Route
+				path={`${MATCH_SUMMARY_PATH}/:sessionId`}
+				element={<MatchSummaryPage />}
+			/>
 		</Route>
 
 		{/* Match Pages (full screen, no main layout) */}
 		<Route path={`${MATCH_PATH}/:sessionId`} element={<MatchPage />} />
 		<Route path={MATCH_PATH} element={<MatchPage />} />
-		<Route
-			path={`${MATCH_SUMMARY_PATH}/:sessionId`}
-			element={<MatchSummaryPage />}
-		/>
 
 		{/* Collaboration Pages (full screen, no main layout) */}
 		<Route
