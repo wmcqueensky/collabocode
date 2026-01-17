@@ -493,7 +493,7 @@ export const matchCompletionService = {
 
 			// Check for existing notifications
 			const { data: existingNotifs } = await supabase
-				.from("match_summary_notifications")
+				.from("summary_notifications")
 				.select("user_id")
 				.eq("session_id", sessionId);
 
@@ -524,7 +524,7 @@ export const matchCompletionService = {
 			}
 
 			const { error: insertError } = await supabase
-				.from("match_summary_notifications")
+				.from("summary_notifications")
 				.insert(newNotifications);
 
 			if (insertError) {

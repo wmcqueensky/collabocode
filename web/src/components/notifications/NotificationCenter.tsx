@@ -79,7 +79,7 @@ const NotificationCenter = () => {
 					{
 						event: "INSERT",
 						schema: "public",
-						table: "match_summary_notifications",
+						table: "summary_notifications",
 						filter: `user_id=eq.${user.id}`,
 					},
 					async (payload) => {
@@ -99,7 +99,7 @@ const NotificationCenter = () => {
 					{
 						event: "UPDATE",
 						schema: "public",
-						table: "match_summary_notifications",
+						table: "summary_notifications",
 						filter: `user_id=eq.${user.id}`,
 					},
 					async () => {
@@ -161,7 +161,7 @@ const NotificationCenter = () => {
 
 			// Get match/session completed notifications (unread)
 			const { data: completedSessions, error: completedError } = await supabase
-				.from("match_summary_notifications")
+				.from("summary_notifications")
 				.select(
 					`
           id,
@@ -268,7 +268,7 @@ const NotificationCenter = () => {
 		try {
 			// Mark notification as read
 			await supabase
-				.from("match_summary_notifications")
+				.from("summary_notifications")
 				.update({ read: true })
 				.eq("id", notification.id);
 
