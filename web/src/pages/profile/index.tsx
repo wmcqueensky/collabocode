@@ -4,13 +4,16 @@ import {
 	Target,
 	Flame,
 	Calendar,
-	TrendingUp,
 	Award,
 	Users,
+	CheckCircle,
+	ExternalLink,
+	Medal,
+	Crown,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface UserProfile {
 	username: string;
@@ -24,8 +27,14 @@ interface UserProfile {
 	created_at: string;
 }
 
+interface SessionParticipant {
+	username: string;
+	user_id: string;
+}
+
 interface SessionHistory {
 	id: string;
+	session_id: string;
 	problem_id: string;
 	type: string;
 	result: string;
@@ -34,6 +43,7 @@ interface SessionHistory {
 	completed: boolean;
 	created_at: string;
 	problem_title?: string;
+	participants?: SessionParticipant[];
 }
 
 interface Statistics {
@@ -42,15 +52,29 @@ interface Statistics {
 	matchLosses: number;
 	matchWinRate: number;
 	totalCollaborations: number;
+	collaborationSuccessRate: number;
+	collaborationSuccesses: number;
 	averageRanking: number;
 	currentStreak: number;
 	longestStreak: number;
-	matchRatingChange: number;
-	collaborationRatingChange: number;
+}
+
+interface LeaderboardEntry {
+	id: string;
+	username: string;
+	rating: number;
+	solved: number;
+	rank: number;
+}
+
+interface Leaderboards {
+	match: LeaderboardEntry[];
+	collaboration: LeaderboardEntry[];
 }
 
 const ProfilePage = () => {
 	const { user } = useAuth();
+	const navigate = useNavigate();
 	const [profile, setProfile] = useState<UserProfile | null>(null);
 	const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>([]);
 	const [statistics, setStatistics] = useState<Statistics>({
@@ -59,21 +83,26 @@ const ProfilePage = () => {
 		matchLosses: 0,
 		matchWinRate: 0,
 		totalCollaborations: 0,
+		collaborationSuccessRate: 0,
+		collaborationSuccesses: 0,
 		averageRanking: 0,
 		currentStreak: 0,
 		longestStreak: 0,
-		matchRatingChange: 0,
-		collaborationRatingChange: 0,
 	});
 	const [loading, setLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState<
 		"overview" | "matches" | "collaborations"
 	>("overview");
+	const [leaderboards, setLeaderboards] = useState<Leaderboards>({
+		match: [],
+		collaboration: [],
+	});
 
 	useEffect(() => {
 		if (user) {
 			loadProfile();
 			loadSessionHistory();
+			loadLeaderboards();
 		}
 	}, [user]);
 
@@ -92,11 +121,52 @@ const ProfilePage = () => {
 		}
 	};
 
+	const loadLeaderboards = async () => {
+		try {
+			// Load match leaderboard (top 10 by match_rating)
+			const { data: matchLeaderboard, error: matchError } = await supabase
+				.from("profiles")
+				.select("id, username, match_rating, match_solved")
+				.order("match_rating", { ascending: false })
+				.limit(10);
+
+			if (matchError) throw matchError;
+
+			// Load collaboration leaderboard (top 10 by collaboration_rating)
+			const { data: collabLeaderboard, error: collabError } = await supabase
+				.from("profiles")
+				.select("id, username, collaboration_rating, collaboration_solved")
+				.order("collaboration_rating", { ascending: false })
+				.limit(10);
+
+			if (collabError) throw collabError;
+
+			setLeaderboards({
+				match: (matchLeaderboard || []).map((entry, index) => ({
+					id: entry.id,
+					username: entry.username,
+					rating: entry.match_rating || 1000,
+					solved: entry.match_solved || 0,
+					rank: index + 1,
+				})),
+				collaboration: (collabLeaderboard || []).map((entry, index) => ({
+					id: entry.id,
+					username: entry.username,
+					rating: entry.collaboration_rating || 1000,
+					solved: entry.collaboration_solved || 0,
+					rank: index + 1,
+				})),
+			});
+		} catch (error) {
+			console.error("Error loading leaderboards:", error);
+		}
+	};
+
 	const loadSessionHistory = async () => {
 		if (!user) return;
 		setLoading(true);
 		try {
-			let history: any[] = [];
+			let history: SessionHistory[] = [];
 
 			const { data: sessionData, error: sessionError } = await supabase
 				.from("session_history")
@@ -127,44 +197,94 @@ const ProfilePage = () => {
 				}));
 			}
 
+			// Fetch participants for each session
+			if (history.length > 0) {
+				const sessionIds = [...new Set(history.map((h) => h.session_id))];
+
+				const { data: participantsData, error: participantsError } =
+					await supabase
+						.from("session_participants")
+						.select(
+							`
+						session_id,
+						user_id,
+						user:profiles(username)
+					`,
+						)
+						.in("session_id", sessionIds)
+						.eq("status", "joined");
+
+				if (!participantsError && participantsData) {
+					// Group participants by session_id
+					const participantsBySession = new Map<string, SessionParticipant[]>();
+
+					participantsData.forEach((p: any) => {
+						const sessionId = p.session_id;
+						if (!participantsBySession.has(sessionId)) {
+							participantsBySession.set(sessionId, []);
+						}
+						participantsBySession.get(sessionId)!.push({
+							user_id: p.user_id,
+							username: p.user?.username || "Unknown",
+						});
+					});
+
+					// Add participants to history items
+					history = history.map((h) => ({
+						...h,
+						participants: participantsBySession.get(h.session_id) || [],
+					}));
+				}
+			}
+
 			setSessionHistory(history);
 
 			if (history.length > 0) {
+				// Separate matches and collaborations
 				const matches = history.filter((h) => h.type === "match" || !h.type);
 				const collaborations = history.filter(
-					(h) => h.type === "collaboration"
-				);
-				const completedMatches = matches.filter((m) => m.completed);
-				const matchWins = completedMatches.filter(
-					(m) => m.ranking === 1
-				).length;
-				const { currentStreak, longestStreak } = calculateStreaks(history);
-				const avgRanking =
-					completedMatches.reduce((sum, m) => sum + (m.ranking || 0), 0) /
-					(completedMatches.length || 1);
-				const matchRatingChange = matches.reduce(
-					(sum, m) => sum + (m.rating_change || 0),
-					0
-				);
-				const collaborationRatingChange = collaborations.reduce(
-					(sum, c) => sum + (c.rating_change || 0),
-					0
+					(h) => h.type === "collaboration",
 				);
 
+				// Count all matches (both completed and not completed are valid game results)
+				// A match is a "win" if ranking === 1, otherwise it's a loss
+				const matchWins = matches.filter((m) => m.ranking === 1).length;
+				const matchLosses = matches.filter((m) => m.ranking > 1).length;
+				const totalMatches = matchWins + matchLosses;
+
+				// Calculate collaboration success rate
+				// A collaboration is successful if result === 'win' or if it's completed with positive rating change
+				const successfulCollaborations = collaborations.filter(
+					(c) => c.result === "win" || (c.completed && c.rating_change > 0),
+				).length;
+				const totalCollaborations = collaborations.length;
+				const collaborationSuccessRate =
+					totalCollaborations > 0
+						? (successfulCollaborations / totalCollaborations) * 100
+						: 0;
+
+				// Calculate streaks based on completed sessions
+				const { currentStreak, longestStreak } = calculateStreaks(history);
+
+				// Calculate average ranking for completed matches
+				const completedMatches = matches.filter((m) => m.completed);
+				const avgRanking =
+					completedMatches.length > 0
+						? completedMatches.reduce((sum, m) => sum + (m.ranking || 0), 0) /
+							completedMatches.length
+						: 0;
+
 				setStatistics({
-					totalMatches: completedMatches.length,
+					totalMatches,
 					matchWins,
-					matchLosses: completedMatches.length - matchWins,
-					matchWinRate:
-						completedMatches.length > 0
-							? (matchWins / completedMatches.length) * 100
-							: 0,
-					totalCollaborations: collaborations.filter((c) => c.completed).length,
+					matchLosses,
+					matchWinRate: totalMatches > 0 ? (matchWins / totalMatches) * 100 : 0,
+					totalCollaborations,
+					collaborationSuccessRate,
+					collaborationSuccesses: successfulCollaborations,
 					averageRanking: avgRanking,
 					currentStreak,
 					longestStreak,
-					matchRatingChange,
-					collaborationRatingChange,
 				});
 			}
 		} catch (error) {
@@ -174,14 +294,14 @@ const ProfilePage = () => {
 		}
 	};
 
-	const calculateStreaks = (history: any[]) => {
+	const calculateStreaks = (history: SessionHistory[]) => {
 		if (!history || history.length === 0)
 			return { currentStreak: 0, longestStreak: 0 };
 		const completedHistory = history
 			.filter((h) => h.completed)
 			.sort(
 				(a, b) =>
-					new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+					new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
 			);
 		let currentStreak = 0;
 		let longestStreak = 0;
@@ -210,7 +330,7 @@ const ProfilePage = () => {
 				const prevDate = new Date(completedHistory[i - 1].created_at);
 				prevDate.setHours(0, 0, 0, 0);
 				const dayDiff = Math.floor(
-					(prevDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+					(prevDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24),
 				);
 				if (dayDiff === 1) {
 					tempStreak++;
@@ -222,23 +342,6 @@ const ProfilePage = () => {
 		}
 		longestStreak = Math.max(longestStreak, tempStreak);
 		return { currentStreak, longestStreak };
-	};
-
-	const getRatingColor = (rating: number) => {
-		if (rating >= 2000) return "text-red-500";
-		if (rating >= 1800) return "text-purple-500";
-		if (rating >= 1600) return "text-yellow-500";
-		if (rating >= 1400) return "text-green-500";
-		return "text-gray-400";
-	};
-
-	const getRatingRank = (rating: number) => {
-		if (rating >= 2000) return "Grandmaster";
-		if (rating >= 1800) return "Master";
-		if (rating >= 1600) return "Expert";
-		if (rating >= 1400) return "Advanced";
-		if (rating >= 1200) return "Intermediate";
-		return "Beginner";
 	};
 
 	const formatDate = (dateString: string) => {
@@ -284,9 +387,37 @@ const ProfilePage = () => {
 
 	const getTypeIcon = (type: string) => {
 		return type === "collaboration" ? (
-			<Users size={14} className="text-purple-500" />
+			<Users size={14} className="text-[#a78bfa]" />
 		) : (
 			<Trophy size={14} className="text-yellow-500" />
+		);
+	};
+
+	// Get other participants (excluding current user)
+	const getOtherParticipants = (participants?: SessionParticipant[]) => {
+		if (!participants || participants.length === 0) return [];
+		return participants.filter((p) => p.user_id !== user?.id);
+	};
+
+	// Format participants display
+	const formatParticipants = (participants?: SessionParticipant[]) => {
+		const others = getOtherParticipants(participants);
+		if (others.length === 0) return "Solo";
+		if (others.length === 1) return `with ${others[0].username}`;
+		if (others.length === 2)
+			return `with ${others[0].username} & ${others[1].username}`;
+		return `with ${others[0].username} & ${others.length - 1} others`;
+	};
+
+	// Get rank icon/badge for leaderboard
+	const getRankDisplay = (rank: number) => {
+		if (rank === 1) return <Crown size={16} className="text-yellow-400" />;
+		if (rank === 2) return <Medal size={16} className="text-gray-300" />;
+		if (rank === 3) return <Medal size={16} className="text-amber-600" />;
+		return (
+			<span className="text-gray-500 text-sm font-mono w-4 text-center">
+				{rank}
+			</span>
 		);
 	};
 
@@ -341,19 +472,15 @@ const ProfilePage = () => {
 							)}
 							<div className="flex flex-wrap items-center gap-4">
 								<div className="flex items-center space-x-2">
-									<Trophy size={18} className={getRatingColor(matchRating)} />
-									<span
-										className={`font-semibold ${getRatingColor(matchRating)}`}
-									>
+									<Trophy size={18} className="text-yellow-500" />
+									<span className="font-semibold text-white">
 										{matchRating}
 									</span>
-									<span className="text-gray-400 text-sm">
-										{getRatingRank(matchRating)} (Match)
-									</span>
+									<span className="text-gray-400 text-sm">(Match)</span>
 								</div>
 								<div className="flex items-center space-x-2">
-									<Users size={18} className="text-purple-500" />
-									<span className="font-semibold text-purple-500">
+									<Users size={18} className="text-[#a78bfa]" />
+									<span className="font-semibold text-white">
 										{collaborationRating}
 									</span>
 									<span className="text-gray-400 text-sm">(Collab)</span>
@@ -376,7 +503,7 @@ const ProfilePage = () => {
 				</div>
 
 				{/* Statistics Grid */}
-				<div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+				<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
 					<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
 						<div className="flex items-center space-x-2 mb-2">
 							<Target className="text-[#5bc6ca]" size={20} />
@@ -402,28 +529,20 @@ const ProfilePage = () => {
 						<p className="text-2xl font-bold">
 							{statistics.matchWinRate.toFixed(1)}%
 						</p>
+						<p className="text-xs text-gray-500">
+							{statistics.matchWins}W / {statistics.matchLosses}L
+						</p>
 					</div>
 					<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
 						<div className="flex items-center space-x-2 mb-2">
-							<TrendingUp
-								className={
-									statistics.matchRatingChange >= 0
-										? "text-green-500"
-										: "text-red-500"
-								}
-								size={20}
-							/>
-							<span className="text-gray-400 text-sm">Match Rating Δ</span>
+							<CheckCircle className="text-[#a78bfa]" size={20} />
+							<span className="text-gray-400 text-sm">Collab Success</span>
 						</div>
-						<p
-							className={`text-2xl font-bold ${
-								statistics.matchRatingChange >= 0
-									? "text-green-500"
-									: "text-red-500"
-							}`}
-						>
-							{statistics.matchRatingChange >= 0 ? "+" : ""}
-							{statistics.matchRatingChange}
+						<p className="text-2xl font-bold">
+							{statistics.collaborationSuccessRate.toFixed(1)}%
+						</p>
+						<p className="text-xs text-gray-500">
+							{statistics.collaborationSuccesses} successful
 						</p>
 					</div>
 					<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
@@ -435,7 +554,7 @@ const ProfilePage = () => {
 					</div>
 					<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
 						<div className="flex items-center space-x-2 mb-2">
-							<Users className="text-purple-500" size={20} />
+							<Users className="text-[#a78bfa]" size={20} />
 							<span className="text-gray-400 text-sm">Collaborations</span>
 						</div>
 						<p className="text-2xl font-bold">
@@ -475,7 +594,7 @@ const ProfilePage = () => {
 									: "text-gray-400 hover:text-white hover:bg-gray-800"
 							}`}
 						>
-							Collaborations
+							Collaboration History
 						</button>
 					</div>
 
@@ -507,15 +626,134 @@ const ProfilePage = () => {
 											<span className="text-gray-400">
 												Collaboration Activity
 											</span>
-											<Users className="text-purple-500" size={20} />
+											<Users className="text-[#a78bfa]" size={20} />
 										</div>
-										<p className="text-2xl font-bold text-purple-500">
+										<p className="text-2xl font-bold text-[#a78bfa]">
 											{statistics.totalCollaborations} Sessions
 										</p>
 										<p className="text-sm text-gray-500 mt-1">
 											{collaborationSolved} problems solved •{" "}
 											{collaborationRating} rating
 										</p>
+									</div>
+								</div>
+
+								{/* Leaderboards Section */}
+								<div className="mt-8">
+									<h3 className="text-lg font-semibold mb-4 flex items-center">
+										<Crown size={20} className="mr-2 text-yellow-500" />
+										Leaderboards
+									</h3>
+									<div className="grid md:grid-cols-2 gap-6">
+										{/* Match Leaderboard */}
+										<div className="bg-[#252525] rounded-lg border border-gray-700 overflow-hidden">
+											<div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 px-4 py-3 border-b border-gray-700">
+												<h4 className="font-semibold flex items-center">
+													<Trophy size={16} className="mr-2 text-yellow-500" />
+													Match Ranking
+												</h4>
+											</div>
+											<div className="divide-y divide-gray-700">
+												{leaderboards.match.length === 0 ? (
+													<div className="p-4 text-center text-gray-500 text-sm">
+														No data available
+													</div>
+												) : (
+													leaderboards.match.map((entry) => (
+														<div
+															key={entry.id}
+															className={`flex items-center justify-between px-4 py-3 hover:bg-[#2a2a2a] transition-colors ${
+																entry.id === user?.id ? "bg-yellow-500/5" : ""
+															}`}
+														>
+															<div className="flex items-center space-x-3">
+																<div className="w-6 flex justify-center">
+																	{getRankDisplay(entry.rank)}
+																</div>
+																<div className="w-8 h-8 rounded-full bg-[#5bc6ca] flex items-center justify-center text-sm font-medium">
+																	{entry.username[0]?.toUpperCase() || "?"}
+																</div>
+																<span
+																	className={`font-medium ${entry.id === user?.id ? "text-yellow-400" : "text-white"}`}
+																>
+																	{entry.username}
+																	{entry.id === user?.id && (
+																		<span className="text-xs text-gray-500 ml-1">
+																			(you)
+																		</span>
+																	)}
+																</span>
+															</div>
+															<div className="flex items-center space-x-4">
+																<div className="text-right">
+																	<p className="font-semibold text-yellow-500">
+																		{entry.rating}
+																	</p>
+																	<p className="text-xs text-gray-500">
+																		{entry.solved} solved
+																	</p>
+																</div>
+															</div>
+														</div>
+													))
+												)}
+											</div>
+										</div>
+
+										{/* Collaboration Leaderboard */}
+										<div className="bg-[#252525] rounded-lg border border-gray-700 overflow-hidden">
+											<div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-4 py-3 border-b border-gray-700">
+												<h4 className="font-semibold flex items-center">
+													<Users size={16} className="mr-2 text-[#a78bfa]" />
+													Collaboration Ranking
+												</h4>
+											</div>
+											<div className="divide-y divide-gray-700">
+												{leaderboards.collaboration.length === 0 ? (
+													<div className="p-4 text-center text-gray-500 text-sm">
+														No data available
+													</div>
+												) : (
+													leaderboards.collaboration.map((entry) => (
+														<div
+															key={entry.id}
+															className={`flex items-center justify-between px-4 py-3 hover:bg-[#2a2a2a] transition-colors ${
+																entry.id === user?.id ? "bg-purple-500/5" : ""
+															}`}
+														>
+															<div className="flex items-center space-x-3">
+																<div className="w-6 flex justify-center">
+																	{getRankDisplay(entry.rank)}
+																</div>
+																<div className="w-8 h-8 rounded-full bg-[#a78bfa] flex items-center justify-center text-sm font-medium">
+																	{entry.username[0]?.toUpperCase() || "?"}
+																</div>
+																<span
+																	className={`font-medium ${entry.id === user?.id ? "text-[#a78bfa]" : "text-white"}`}
+																>
+																	{entry.username}
+																	{entry.id === user?.id && (
+																		<span className="text-xs text-gray-500 ml-1">
+																			(you)
+																		</span>
+																	)}
+																</span>
+															</div>
+															<div className="flex items-center space-x-4">
+																<div className="text-right">
+																	<p className="font-semibold text-[#a78bfa]">
+																		{entry.rating}
+																	</p>
+																	<p className="text-xs text-gray-500">
+																		{entry.solved} solved
+																	</p>
+																</div>
+															</div>
+														</div>
+													))
+												)}
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -540,7 +778,10 @@ const ProfilePage = () => {
 											.map((session) => (
 												<div
 													key={session.id}
-													className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:border-gray-600 transition-colors"
+													onClick={() =>
+														navigate(`/match-summary/${session.session_id}`)
+													}
+													className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:border-[#5bc6ca] hover:bg-[#2a2a2a] transition-all cursor-pointer"
 												>
 													<div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
 														<div className="flex-1">
@@ -550,35 +791,41 @@ const ProfilePage = () => {
 																	{session.problem_title}
 																</h4>
 															</div>
-															<p className="text-sm text-gray-400">
-																{formatDate(session.created_at)}
-															</p>
+															<div className="flex items-center space-x-3 text-sm text-gray-400">
+																<span>{formatDate(session.created_at)}</span>
+																<span className="text-gray-600">•</span>
+																<span className="flex items-center">
+																	<Users size={12} className="mr-1" />
+																	{formatParticipants(session.participants)}
+																</span>
+															</div>
 														</div>
 														<div className="flex items-center gap-4">
-															{session.completed ? (
-																<>
-																	{getResultBadge(
-																		session.ranking,
-																		session.type || "match"
-																	)}
-																	<div
-																		className={`text-sm font-medium ${
-																			(session.rating_change || 0) >= 0
-																				? "text-green-500"
-																				: "text-red-500"
-																		}`}
-																	>
-																		{(session.rating_change || 0) >= 0
-																			? "+"
-																			: ""}
-																		{session.rating_change || 0} ELO
-																	</div>
-																</>
-															) : (
-																<span className="px-2 py-1 bg-gray-500 bg-opacity-10 text-gray-400 rounded-full text-xs font-medium">
-																	Incomplete
-																</span>
+															{getResultBadge(
+																session.ranking,
+																session.type || "match",
 															)}
+															<div
+																className={`text-sm font-medium ${
+																	(session.rating_change || 0) >= 0
+																		? "text-green-500"
+																		: "text-red-500"
+																}`}
+															>
+																{(session.rating_change || 0) >= 0 ? "+" : ""}
+																{session.rating_change || 0} ELO
+															</div>
+															{!session.completed &&
+																!session.rating_change &&
+																!session.ranking && (
+																	<span className="px-2 py-1 bg-gray-500 bg-opacity-10 text-gray-400 rounded-full text-xs font-medium">
+																		In Progress
+																	</span>
+																)}
+															<ExternalLink
+																size={16}
+																className="text-gray-500"
+															/>
 														</div>
 													</div>
 												</div>
@@ -611,7 +858,12 @@ const ProfilePage = () => {
 											.map((session) => (
 												<div
 													key={session.id}
-													className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:border-gray-600 transition-colors"
+													onClick={() =>
+														navigate(
+															`/collaboration-summary/${session.session_id}`,
+														)
+													}
+													className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:border-[#a78bfa] hover:bg-[#2a2a2a] transition-all cursor-pointer"
 												>
 													<div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
 														<div className="flex-1">
@@ -621,16 +873,26 @@ const ProfilePage = () => {
 																	{session.problem_title}
 																</h4>
 															</div>
-															<p className="text-sm text-gray-400">
-																{formatDate(session.created_at)}
-															</p>
+															<div className="flex items-center space-x-3 text-sm text-gray-400">
+																<span>{formatDate(session.created_at)}</span>
+																<span className="text-gray-600">•</span>
+																<span className="flex items-center">
+																	<Users
+																		size={12}
+																		className="mr-1 text-[#a78bfa]"
+																	/>
+																	{formatParticipants(session.participants)}
+																</span>
+															</div>
 														</div>
 														<div className="flex items-center gap-4">
-															{session.completed ? (
+															{session.completed ||
+															session.rating_change ||
+															session.ranking ? (
 																<>
 																	{getResultBadge(
 																		session.ranking,
-																		"collaboration"
+																		"collaboration",
 																	)}
 																	<div
 																		className={`text-sm font-medium ${
@@ -650,6 +912,10 @@ const ProfilePage = () => {
 																	Incomplete
 																</span>
 															)}
+															<ExternalLink
+																size={16}
+																className="text-gray-500"
+															/>
 														</div>
 													</div>
 												</div>
