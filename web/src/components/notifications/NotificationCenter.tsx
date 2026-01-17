@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, X, Check, Clock, Users, Trophy, Rocket } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -14,11 +14,34 @@ type Notification = {
 	read: boolean;
 };
 
-const NotificationCenter = () => {
+interface NotificationCenterProps {
+	onOpenChange?: (isOpen: boolean) => void;
+	closeSignal?: number; // External signal to close the dropdown (increments when parent wants to close)
+}
+
+const NotificationCenter = ({
+	onOpenChange,
+	closeSignal,
+}: NotificationCenterProps = {}) => {
 	const navigate = useNavigate();
 	const [notifications, setNotifications] = useState<Notification[]>([]);
 	const [isOpen, setIsOpen] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const dropdownRef = useRef<HTMLDivElement>(null);
+	const prevCloseSignal = useRef(closeSignal);
+
+	// Notify parent when dropdown state changes
+	useEffect(() => {
+		onOpenChange?.(isOpen);
+	}, [isOpen, onOpenChange]);
+
+	// Close dropdown when closeSignal prop changes
+	useEffect(() => {
+		if (closeSignal !== undefined && closeSignal !== prevCloseSignal.current) {
+			prevCloseSignal.current = closeSignal;
+			setIsOpen(false);
+		}
+	}, [closeSignal]);
 
 	useEffect(() => {
 		loadNotifications();
@@ -58,7 +81,7 @@ const NotificationCenter = () => {
 								icon: "/logo.png",
 							});
 						}
-					}
+					},
 				)
 				// Listen for updates to session invites
 				.on(
@@ -71,7 +94,7 @@ const NotificationCenter = () => {
 					},
 					async () => {
 						await loadNotifications();
-					}
+					},
 				)
 				// Listen for match/session completed notifications
 				.on(
@@ -92,7 +115,7 @@ const NotificationCenter = () => {
 								icon: "/logo.png",
 							});
 						}
-					}
+					},
 				)
 				.on(
 					"postgres_changes",
@@ -104,7 +127,7 @@ const NotificationCenter = () => {
 					},
 					async () => {
 						await loadNotifications();
-					}
+					},
 				)
 				.subscribe((status) => {
 					console.log("📡 Notification subscription status:", status);
@@ -131,6 +154,43 @@ const NotificationCenter = () => {
 		};
 	}, []);
 
+	// Handle click outside to close dropdown
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
+				setIsOpen(false);
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [isOpen]);
+
+	// Handle escape key
+	useEffect(() => {
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setIsOpen(false);
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("keydown", handleEscape);
+		}
+
+		return () => {
+			document.removeEventListener("keydown", handleEscape);
+		};
+	}, [isOpen]);
+
 	const loadNotifications = async () => {
 		try {
 			const {
@@ -151,7 +211,7 @@ const NotificationCenter = () => {
             problem:problems(*),
             host:profiles(*)
           )
-        `
+        `,
 				)
 				.eq("user_id", user.id)
 				.eq("status", "invited")
@@ -174,7 +234,7 @@ const NotificationCenter = () => {
             problem:problems(*),
             host:profiles(*)
           )
-        `
+        `,
 				)
 				.eq("user_id", user.id)
 				.eq("read", false)
@@ -190,7 +250,7 @@ const NotificationCenter = () => {
 					session: invite.session,
 					createdAt: invite.joined_at,
 					read: false,
-				})
+				}),
 			);
 
 			const completedNotifs: Notification[] = (completedSessions || []).map(
@@ -204,7 +264,7 @@ const NotificationCenter = () => {
 					session: session.session,
 					createdAt: session.created_at,
 					read: session.read,
-				})
+				}),
 			);
 
 			setNotifications([...completedNotifs, ...inviteNotifs]);
@@ -225,7 +285,7 @@ const NotificationCenter = () => {
 			await sessionService.updateParticipantStatus(
 				notification.session.id,
 				user.id,
-				"joined"
+				"joined",
 			);
 
 			setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
@@ -254,7 +314,7 @@ const NotificationCenter = () => {
 			await sessionService.updateParticipantStatus(
 				notification.session.id,
 				user.id,
-				"declined"
+				"declined",
 			);
 
 			setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
@@ -290,7 +350,7 @@ const NotificationCenter = () => {
 	const unreadCount = notifications.filter((n) => !n.read).length;
 
 	return (
-		<div className="relative">
+		<div className="relative" ref={dropdownRef}>
 			{/* Bell Icon */}
 			<button
 				onClick={() => setIsOpen(!isOpen)}
@@ -459,9 +519,9 @@ const NotificationCenter = () => {
 																"Easy"
 																	? "bg-green-600"
 																	: notification.session.problem?.difficulty ===
-																	  "Medium"
-																	? "bg-yellow-600"
-																	: "bg-red-600"
+																		  "Medium"
+																		? "bg-yellow-600"
+																		: "bg-red-600"
 															}`}
 														>
 															{notification.session.problem?.difficulty}

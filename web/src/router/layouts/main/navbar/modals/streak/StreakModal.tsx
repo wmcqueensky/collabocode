@@ -1,15 +1,22 @@
-import { useEffect, useState } from "react";
-import { X, Flame, Trophy, Sparkles, Calendar } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { X, Flame, Sparkles, Calendar, TrendingUp, Zap } from "lucide-react";
 
 interface StreakModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	streak: number;
+	activityHistory?: Date[]; // Optional: dates when user was active
 }
 
-const StreakModal = ({ isOpen, onClose, streak }: StreakModalProps) => {
+const StreakModal = ({
+	isOpen,
+	onClose,
+	streak,
+	activityHistory = [],
+}: StreakModalProps) => {
 	const [animateIn, setAnimateIn] = useState(false);
 	const [showConfetti, setShowConfetti] = useState(false);
+	const modalRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -21,39 +28,109 @@ const StreakModal = ({ isOpen, onClose, streak }: StreakModalProps) => {
 		}
 	}, [isOpen]);
 
+	// Handle outside click
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				modalRef.current &&
+				!modalRef.current.contains(event.target as Node)
+			) {
+				onClose();
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [isOpen, onClose]);
+
+	// Handle escape key
+	useEffect(() => {
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				onClose();
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("keydown", handleEscape);
+		}
+
+		return () => {
+			document.removeEventListener("keydown", handleEscape);
+		};
+	}, [isOpen, onClose]);
+
 	if (!isOpen) return null;
 
 	const getStreakMessage = () => {
-		if (streak === 1)
-			return "You started a new streak! Come back tomorrow to keep it going.";
-		if (streak < 7) return "Nice! Keep the momentum going!";
-		if (streak < 30) return "You're on fire! Amazing consistency!";
-		if (streak < 100) return "Incredible dedication! You're unstoppable!";
+		if (streak === 1) return "Welcome back! Start building your streak.";
+		if (streak < 7) return "Great start! Keep the momentum going!";
+		if (streak < 14) return "You're building a great habit!";
+		if (streak < 30) return "Impressive consistency! You're on fire!";
+		if (streak < 100) return "Amazing dedication! Keep pushing!";
 		return "LEGENDARY! You're a coding machine!";
 	};
 
 	const getStreakEmoji = () => {
-		if (streak < 7) return "🔥";
-		if (streak < 30) return "⚡";
-		if (streak < 100) return "💎";
+		if (streak < 3) return "🔥";
+		if (streak < 7) return "⚡";
+		if (streak < 14) return "🚀";
+		if (streak < 30) return "💎";
+		if (streak < 100) return "🏆";
 		return "👑";
 	};
 
-	const getMilestoneReward = () => {
-		const milestones = [7, 30, 100, 365];
-		const nextMilestone = milestones.find((m) => m > streak) || streak + 10;
-		const daysUntil = nextMilestone - streak;
-		return { nextMilestone, daysUntil };
+	// Generate last 28 days (4 weeks) for the activity calendar
+	const generateCalendarDays = () => {
+		const days = [];
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		for (let i = 27; i >= 0; i--) {
+			const date = new Date(today);
+			date.setDate(today.getDate() - i);
+
+			// Check if this date is within the current streak
+			const isWithinStreak = i < streak;
+
+			// Check if date is in activity history (if provided)
+			const isActive =
+				activityHistory.length > 0
+					? activityHistory.some((d) => {
+							const actDate = new Date(d);
+							actDate.setHours(0, 0, 0, 0);
+							return actDate.getTime() === date.getTime();
+						})
+					: isWithinStreak;
+
+			days.push({
+				date,
+				isActive,
+				isToday: i === 0,
+				dayOfWeek: date.getDay(),
+			});
+		}
+		return days;
 	};
 
-	const { nextMilestone, daysUntil } = getMilestoneReward();
+	const calendarDays = generateCalendarDays();
+	const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
+
+	// Calculate stats
+	const activeDaysThisMonth = calendarDays.filter((d) => d.isActive).length;
+	const consistencyRate = Math.round((activeDaysThisMonth / 28) * 100);
 
 	return (
 		<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
 			{/* Confetti particles */}
-			{showConfetti && (
+			{showConfetti && streak > 1 && (
 				<div className="absolute inset-0 overflow-hidden pointer-events-none">
-					{[...Array(20)].map((_, i) => (
+					{[...Array(15)].map((_, i) => (
 						<div
 							key={i}
 							className="absolute animate-confetti"
@@ -80,6 +157,7 @@ const StreakModal = ({ isOpen, onClose, streak }: StreakModalProps) => {
 			)}
 
 			<div
+				ref={modalRef}
 				className={`bg-gradient-to-br from-[#252525] to-[#1a1a1a] rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 overflow-hidden transform transition-all duration-500 ${
 					animateIn ? "scale-100 opacity-100" : "scale-90 opacity-0"
 				}`}
@@ -114,66 +192,97 @@ const StreakModal = ({ isOpen, onClose, streak }: StreakModalProps) => {
 				<div className="px-6 py-6">
 					<p className="text-gray-300 text-center mb-6">{getStreakMessage()}</p>
 
-					{/* Progress to next milestone */}
-					<div className="bg-[#1a1a1a] rounded-xl p-4 mb-6 border border-gray-700">
-						<div className="flex items-center justify-between mb-2">
-							<span className="text-sm text-gray-400 flex items-center gap-2">
-								<Trophy size={16} className="text-yellow-500" />
-								Next milestone
-							</span>
-							<span className="text-sm font-semibold text-[#5bc6ca]">
-								{nextMilestone} days
-							</span>
+					{/* Stats Row */}
+					<div className="grid grid-cols-3 gap-3 mb-6">
+						<div className="bg-[#1a1a1a] rounded-xl p-3 text-center border border-gray-700">
+							<Flame size={20} className="mx-auto text-orange-500 mb-1" />
+							<p className="text-xl font-bold text-white">{streak}</p>
+							<p className="text-xs text-gray-500">Current</p>
 						</div>
-						<div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-							<div
-								className="h-full bg-gradient-to-r from-orange-500 to-yellow-400 rounded-full transition-all duration-1000 ease-out"
-								style={{
-									width: `${((streak % nextMilestone) / nextMilestone) * 100}%`,
-								}}
-							/>
+						<div className="bg-[#1a1a1a] rounded-xl p-3 text-center border border-gray-700">
+							<Zap size={20} className="mx-auto text-yellow-500 mb-1" />
+							<p className="text-xl font-bold text-white">
+								{activeDaysThisMonth}
+							</p>
+							<p className="text-xs text-gray-500">Active Days</p>
 						</div>
-						<p className="text-xs text-gray-500 mt-2 text-center">
-							{daysUntil} day{daysUntil !== 1 ? "s" : ""} until your next
-							reward!
-						</p>
+						<div className="bg-[#1a1a1a] rounded-xl p-3 text-center border border-gray-700">
+							<TrendingUp size={20} className="mx-auto text-green-500 mb-1" />
+							<p className="text-xl font-bold text-white">{consistencyRate}%</p>
+							<p className="text-xs text-gray-500">Consistency</p>
+						</div>
 					</div>
 
-					{/* Weekly calendar view */}
+					{/* Activity Calendar (Last 4 weeks) */}
 					<div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-700">
 						<div className="flex items-center gap-2 mb-3">
 							<Calendar size={16} className="text-gray-400" />
-							<span className="text-sm text-gray-400">This week</span>
+							<span className="text-sm text-gray-400">Last 4 weeks</span>
 						</div>
-						<div className="flex justify-between gap-1">
-							{["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
-								const today = new Date().getDay();
-								const isActive = index <= today && streak >= today - index + 1;
-								const isToday = index === today;
 
-								return (
-									<div key={index} className="flex flex-col items-center gap-1">
-										<span className="text-xs text-gray-500">{day}</span>
-										<div
-											className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-												isToday
-													? "bg-gradient-to-br from-orange-500 to-red-500 ring-2 ring-orange-500/50"
-													: isActive
-													? "bg-gradient-to-br from-orange-500/50 to-red-500/50"
-													: "bg-gray-700"
-											}`}
-										>
-											{isActive && (
-												<Flame
-													size={14}
-													className={isToday ? "text-white" : "text-orange-300"}
-												/>
-											)}
-										</div>
-									</div>
-								);
-							})}
+						{/* Week day headers */}
+						<div className="grid grid-cols-7 gap-1 mb-2">
+							{weekDays.map((day, index) => (
+								<div key={index} className="text-center">
+									<span className="text-xs text-gray-600">{day}</span>
+								</div>
+							))}
 						</div>
+
+						{/* Calendar grid */}
+						<div className="grid grid-cols-7 gap-1">
+							{calendarDays.map((day, index) => (
+								<div
+									key={index}
+									className={`aspect-square rounded-sm flex items-center justify-center transition-all ${
+										day.isToday
+											? "ring-2 ring-orange-500 ring-offset-1 ring-offset-[#1a1a1a]"
+											: ""
+									} ${
+										day.isActive
+											? day.isToday
+												? "bg-gradient-to-br from-orange-500 to-red-500"
+												: "bg-gradient-to-br from-orange-500/60 to-red-500/60"
+											: "bg-gray-800"
+									}`}
+									title={day.date.toLocaleDateString()}
+								>
+									{day.isActive && (
+										<Flame
+											size={10}
+											className={day.isToday ? "text-white" : "text-orange-200"}
+										/>
+									)}
+								</div>
+							))}
+						</div>
+
+						{/* Legend */}
+						<div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-500">
+							<div className="flex items-center gap-1">
+								<div className="w-3 h-3 rounded-sm bg-gray-800" />
+								<span>Inactive</span>
+							</div>
+							<div className="flex items-center gap-1">
+								<div className="w-3 h-3 rounded-sm bg-gradient-to-br from-orange-500/60 to-red-500/60" />
+								<span>Active</span>
+							</div>
+							<div className="flex items-center gap-1">
+								<div className="w-3 h-3 rounded-sm bg-gradient-to-br from-orange-500 to-red-500 ring-1 ring-orange-500" />
+								<span>Today</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Motivation message */}
+					<div className="mt-4 text-center">
+						<p className="text-sm text-gray-500">
+							{streak === 0
+								? "Start your streak by completing a match or collaboration today!"
+								: streak < 7
+									? "Come back tomorrow to keep your streak alive!"
+									: "You're doing amazing! Keep up the great work!"}
+						</p>
 					</div>
 				</div>
 

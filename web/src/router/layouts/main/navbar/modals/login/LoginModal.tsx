@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../../../../../../contexts/AuthContext";
 
@@ -14,6 +14,44 @@ const LoginModal = ({ isOpen, onClose, onSwitchModal }: LoginModalProps) => {
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
+	const modalRef = useRef<HTMLDivElement>(null);
+
+	// Handle outside click
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				modalRef.current &&
+				!modalRef.current.contains(event.target as Node)
+			) {
+				handleClose();
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [isOpen]);
+
+	// Handle escape key
+	useEffect(() => {
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				handleClose();
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("keydown", handleEscape);
+		}
+
+		return () => {
+			document.removeEventListener("keydown", handleEscape);
+		};
+	}, [isOpen]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -44,13 +82,16 @@ const LoginModal = ({ isOpen, onClose, onSwitchModal }: LoginModalProps) => {
 
 	return (
 		<div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-			<div className="bg-[#252525] rounded-lg shadow-xl w-full max-w-md">
+			<div
+				ref={modalRef}
+				className="bg-[#252525] rounded-lg shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200"
+			>
 				<div className="p-6">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-xl font-semibold text-white">Sign In</h2>
 						<button
 							onClick={handleClose}
-							className="text-gray-400 hover:text-white"
+							className="text-gray-400 hover:text-white transition-colors"
 						>
 							<X size={20} />
 						</button>
@@ -112,7 +153,6 @@ const LoginModal = ({ isOpen, onClose, onSwitchModal }: LoginModalProps) => {
 									Remember me
 								</label>
 							</div>
-
 							<div className="text-sm">
 								<a href="#" className="text-[#5bc6ca] hover:text-[#48aeb3]">
 									Forgot password?

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
 	ChevronDown,
@@ -26,15 +26,15 @@ interface UserStats {
 	streak: number;
 }
 
+type ModalType = "login" | "register" | "streak" | null;
+
 const Navbar = () => {
 	const { user, signOut, loading } = useAuth();
 	const location = useLocation();
 	const navigate = useNavigate();
 	const [showMobileMenu, setShowMobileMenu] = useState(false);
 	const [showUserMenu, setShowUserMenu] = useState(false);
-	const [showLoginModal, setShowLoginModal] = useState(false);
-	const [showRegisterModal, setShowRegisterModal] = useState(false);
-	const [showStreakModal, setShowStreakModal] = useState(false);
+	const [activeModal, setActiveModal] = useState<ModalType>(null);
 	const [statsLoading, setStatsLoading] = useState(true);
 	const [userStats, setUserStats] = useState<UserStats>({
 		matchRating: 1500,
@@ -43,6 +43,30 @@ const Navbar = () => {
 		collaborationSolved: 0,
 		streak: 0,
 	});
+	const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+	const notificationCloseSignal = useRef(0); // Use a counter to signal close
+
+	// Close any open modal
+	const closeModal = useCallback(() => {
+		setActiveModal(null);
+	}, []);
+
+	// Open a specific modal (closes any other open modal first and closes notifications)
+	const openModal = useCallback((modal: ModalType) => {
+		setActiveModal(modal);
+		notificationCloseSignal.current += 1; // Signal to close notifications
+	}, []);
+
+	// Switch between login and register modals
+	const switchToRegister = useCallback(() => {
+		setActiveModal("register");
+		setIsNotificationOpen(false);
+	}, []);
+
+	const switchToLogin = useCallback(() => {
+		setActiveModal("login");
+		setIsNotificationOpen(false);
+	}, []);
 
 	useEffect(() => {
 		if (user) {
@@ -62,7 +86,7 @@ const Navbar = () => {
 					},
 					() => {
 						fetchUserStats();
-					}
+					},
 				)
 				.subscribe();
 
@@ -99,7 +123,10 @@ const Navbar = () => {
 				const streakResult = await userService.updateDailyStreak(user.id);
 				if (streakResult) {
 					setUserStats((prev) => ({ ...prev, streak: streakResult.streak }));
-					setShowStreakModal(true);
+					// Only show streak modal if no other modal is open
+					if (activeModal === null) {
+						setActiveModal("streak");
+					}
 				}
 				localStorage.setItem(lastLoginKey, today);
 			}
@@ -110,6 +137,7 @@ const Navbar = () => {
 
 	const toggleUserMenu = () => {
 		setShowUserMenu(!showUserMenu);
+		notificationCloseSignal.current += 1; // Signal to close notifications
 	};
 
 	const handleLogout = async () => {
@@ -117,19 +145,22 @@ const Navbar = () => {
 		setShowUserMenu(false);
 	};
 
-	const switchToRegister = () => {
-		setShowLoginModal(false);
-		setShowRegisterModal(true);
-	};
-
-	const switchToLogin = () => {
-		setShowRegisterModal(false);
-		setShowLoginModal(true);
-	};
-
 	const handleLogoClick = () => {
 		navigate("/explore");
 	};
+
+	// Close user menu when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			if (showUserMenu && !target.closest("[data-user-menu]")) {
+				setShowUserMenu(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, [showUserMenu]);
 
 	const username =
 		user?.user_metadata?.username || user?.email?.split("@")[0] || "User";
@@ -215,16 +246,19 @@ const Navbar = () => {
 								{statsLoading ? (
 									<StatSkeleton />
 								) : (
-									<div className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-orange-500/50">
+									<button
+										onClick={() => openModal("streak")}
+										className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-orange-500/50 hover:bg-[#2a2a2a]"
+									>
 										<Flame size={16} className="text-orange-500" />
 										<span className="text-sm font-semibold text-white">
 											{userStats.streak}
 										</span>
 										<span className="text-xs text-gray-400">streak</span>
-									</div>
+									</button>
 								)}
 
-								{/* Match Rating - Changed from ELO to Match */}
+								{/* Match Rating */}
 								{statsLoading ? (
 									<StatSkeleton />
 								) : (
@@ -240,7 +274,7 @@ const Navbar = () => {
 									</div>
 								)}
 
-								{/* Collaboration Rating - uses harmonious violet */}
+								{/* Collaboration Rating */}
 								{statsLoading ? (
 									<StatSkeleton />
 								) : (
@@ -273,10 +307,13 @@ const Navbar = () => {
 								)}
 							</div>
 
-							<NotificationCenter />
+							<NotificationCenter
+								onOpenChange={setIsNotificationOpen}
+								closeSignal={notificationCloseSignal.current}
+							/>
 
 							{/* User Menu */}
-							<div className="relative">
+							<div className="relative" data-user-menu>
 								<button
 									onClick={toggleUserMenu}
 									className="flex items-center space-x-1 focus:outline-none"
@@ -317,7 +354,13 @@ const Navbar = () => {
 													</>
 												) : (
 													<>
-														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
+														<button
+															onClick={() => {
+																setShowUserMenu(false);
+																openModal("streak");
+															}}
+															className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded hover:bg-[#252525] transition-colors"
+														>
 															<Flame size={14} className="text-orange-500" />
 															<span className="text-xs font-semibold text-white">
 																{userStats.streak}
@@ -325,7 +368,7 @@ const Navbar = () => {
 															<span className="text-xs text-gray-500">
 																streak
 															</span>
-														</div>
+														</button>
 														<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
 															<Trophy size={14} className="text-yellow-500" />
 															<span className="text-xs font-semibold text-white">
@@ -400,13 +443,13 @@ const Navbar = () => {
 					) : (
 						<>
 							<button
-								onClick={() => setShowLoginModal(true)}
+								onClick={() => openModal("login")}
 								className="hidden sm:block text-gray-300 hover:text-white px-3 py-1 rounded-md text-sm"
 							>
 								Sign In
 							</button>
 							<button
-								onClick={() => setShowRegisterModal(true)}
+								onClick={() => openModal("register")}
 								className="bg-[#5bc6ca] hover:bg-[#48aeb3] text-white px-3 py-1 rounded-md text-sm transition-colors"
 							>
 								Register
@@ -461,7 +504,7 @@ const Navbar = () => {
 							<>
 								<button
 									onClick={() => {
-										setShowLoginModal(true);
+										openModal("login");
 										setShowMobileMenu(false);
 									}}
 									className="block w-full text-left py-2 text-gray-300"
@@ -470,7 +513,7 @@ const Navbar = () => {
 								</button>
 								<button
 									onClick={() => {
-										setShowRegisterModal(true);
+										openModal("register");
 										setShowMobileMenu(false);
 									}}
 									className="block w-full text-left py-2 text-[#5bc6ca]"
@@ -483,21 +526,22 @@ const Navbar = () => {
 				</div>
 			)}
 
+			{/* Modals - Only one can be open at a time */}
 			<LoginModal
-				isOpen={showLoginModal}
-				onClose={() => setShowLoginModal(false)}
+				isOpen={activeModal === "login"}
+				onClose={closeModal}
 				onSwitchModal={switchToRegister}
 			/>
 
 			<RegisterModal
-				isOpen={showRegisterModal}
-				onClose={() => setShowRegisterModal(false)}
+				isOpen={activeModal === "register"}
+				onClose={closeModal}
 				onSwitchModal={switchToLogin}
 			/>
 
 			<StreakModal
-				isOpen={showStreakModal}
-				onClose={() => setShowStreakModal(false)}
+				isOpen={activeModal === "streak"}
+				onClose={closeModal}
 				streak={userStats.streak}
 			/>
 		</header>
