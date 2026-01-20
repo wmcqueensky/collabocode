@@ -15,7 +15,7 @@ import { supabase } from "../../../../lib/supabase";
 import { userService } from "../../../../services/userService";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
-import NotificationCenter from "../../../../components/notifications/NotificationCenter";
+import NotificationCenter from "../../../../notifications";
 import StreakModal from "./modals/streak/StreakModal";
 
 interface UserStats {
