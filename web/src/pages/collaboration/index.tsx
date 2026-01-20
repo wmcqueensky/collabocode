@@ -18,10 +18,10 @@ import {
 } from "lucide-react";
 
 // Components
-import { OutputPanel } from "../match/editor/OutputPanel";
-import { ChatPanel } from "../match/chat/ChatPanel";
-import { WaitingLobby } from "../match/lobby/WaitingLobby";
-import { ProblemPanel } from "../match/problem-panel/ProblemPanel";
+import { OutputPanel } from "./components/OutputPanel";
+import { ChatPanel } from "./components/ChatPanel";
+import { WaitingLobby } from "./components/WaitingLobby";
+import { ProblemPanel } from "./components/ProblemPanel";
 import CollaborativeMonacoEditor from "./components/CollaborativeMonacoEditor";
 import WaitingForSubmissionModal from "./components/WaitingForSubmissionModal";
 
@@ -58,7 +58,7 @@ class CollaborationDocumentAdapter implements CollaborationDocument {
 	constructor(
 		provider: SupabaseYjsProvider,
 		sessionId: string,
-		fileId: string = "main"
+		fileId: string = "main",
 	) {
 		this.provider = provider;
 		this.sessionId = sessionId;
@@ -137,7 +137,7 @@ export default function CollaborationPage() {
 	const [isMicOn, setIsMicOn] = useState(false);
 	const [activeProblemTab, setActiveProblemTab] = useState("description");
 	const [mobileView, setMobileView] = useState<"code" | "problem" | "chat">(
-		"code"
+		"code",
 	);
 	const [isMobile, setIsMobile] = useState(false);
 
@@ -183,7 +183,7 @@ export default function CollaborationPage() {
 					.single();
 
 				setCurrentUserName(
-					profile?.username || user.email?.split("@")[0] || "User"
+					profile?.username || user.email?.split("@")[0] || "User",
 				);
 			} else {
 				navigate("/explore");
@@ -213,14 +213,13 @@ export default function CollaborationPage() {
 
 				setSession(sessionData);
 
-				const participantsData = await sessionService.getSessionParticipants(
-					sessionId
-				);
+				const participantsData =
+					await sessionService.getSessionParticipants(sessionId);
 				setParticipants(participantsData);
 
 				// Check if current user has already marked ready_to_submit
 				const currentParticipant = participantsData.find(
-					(p) => p.user_id === currentUserId
+					(p) => p.user_id === currentUserId,
 				);
 				if (currentParticipant?.submission_time) {
 					const testResults = currentParticipant.test_results as any;
@@ -307,7 +306,7 @@ export default function CollaborationPage() {
 			const adapter = new CollaborationDocumentAdapter(
 				provider,
 				sessionId,
-				"main"
+				"main",
 			);
 			adapter.connect();
 			setCollaborationDoc(adapter);
@@ -360,7 +359,7 @@ export default function CollaborationPage() {
 						const result = await executeCode(
 							finalCode,
 							session.language,
-							JSON.stringify(testCase.input)
+							JSON.stringify(testCase.input),
 						);
 						return (
 							result.status === "success" &&
@@ -369,7 +368,7 @@ export default function CollaborationPage() {
 					} catch {
 						return false;
 					}
-				})
+				}),
 			);
 
 			const allPassed = results.every((r) => r);
@@ -440,14 +439,13 @@ export default function CollaborationPage() {
 					filter: `session_id=eq.${sessionId}`,
 				},
 				async () => {
-					const updated = await sessionService.getSessionParticipants(
-						sessionId
-					);
+					const updated =
+						await sessionService.getSessionParticipants(sessionId);
 					setParticipants(updated);
 
 					// Check if all participants are now ready to submit
 					const joinedParticipants = updated.filter(
-						(p) => p.status === "joined"
+						(p) => p.status === "joined",
 					);
 					const allReadyToSubmit = joinedParticipants.every((p) => {
 						const testResults = p.test_results as any;
@@ -467,7 +465,7 @@ export default function CollaborationPage() {
 						console.log("All participants ready - processing final submission");
 						await processFinalSubmission();
 					}
-				}
+				},
 			)
 			.subscribe();
 
@@ -488,7 +486,7 @@ export default function CollaborationPage() {
 					if (updated.status === "completed") {
 						navigate(`/collaboration-summary/${sessionId}`);
 					}
-				}
+				},
 			)
 			.subscribe();
 
@@ -569,7 +567,7 @@ export default function CollaborationPage() {
 						const result = await executeCode(
 							code,
 							session.language,
-							JSON.stringify(testCase.input)
+							JSON.stringify(testCase.input),
 						);
 						const passed =
 							result.status === "success" &&
@@ -582,7 +580,7 @@ export default function CollaborationPage() {
 					} catch {
 						return { ...testCase, result: "Error", status: "fail" as const };
 					}
-				})
+				}),
 			);
 
 			setTestCases(results);
@@ -647,11 +645,10 @@ export default function CollaborationPage() {
 			]);
 
 			// Check if all participants are already ready (we might be the last one)
-			const updatedParticipants = await sessionService.getSessionParticipants(
-				sessionId
-			);
+			const updatedParticipants =
+				await sessionService.getSessionParticipants(sessionId);
 			const joinedParticipants = updatedParticipants.filter(
-				(p) => p.status === "joined"
+				(p) => p.status === "joined",
 			);
 			const allReadyToSubmit = joinedParticipants.every((p) => {
 				const testResults = p.test_results as any;
@@ -660,7 +657,7 @@ export default function CollaborationPage() {
 
 			if (allReadyToSubmit && joinedParticipants.length > 0) {
 				console.log(
-					"All participants ready (including self) - processing final submission"
+					"All participants ready (including self) - processing final submission",
 				);
 				await processFinalSubmission();
 			}
@@ -726,8 +723,8 @@ export default function CollaborationPage() {
 			session.language === "javascript"
 				? "js"
 				: session.language === "typescript"
-				? "ts"
-				: "py"
+					? "ts"
+					: "py"
 		}`,
 		language: session.language,
 		content: starterCode,

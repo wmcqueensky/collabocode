@@ -33,7 +33,7 @@ export const Navbar = ({
 					<h1 className="font-bold text-lg sm:text-xl text-[#5bc6ca] flex items-center">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
-							className="w-5 h-5 sm:w-7 sm:h-7 text-white mr-1"
+							className="w-5 h-5 sm:w-7 sm:h-7 text-[#a78bfa] mr-1"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
