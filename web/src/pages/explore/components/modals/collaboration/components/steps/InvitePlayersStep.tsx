@@ -1,27 +1,9 @@
 import { useState } from "react";
 import { Search, Users, Clock, Code, Check, Loader2 } from "lucide-react";
-import type { Problem, Profile } from "../../../../../../../types/database";
+import type { Profile } from "../../../../../../../types/database";
 
-type InvitePlayersStepProps = {
-	selectedProblem: Problem | null;
-	selectedLanguage: string;
-	selectedPlayers: Profile[];
-	setSelectedPlayers: (players: Profile[]) => void;
-	availablePlayers: Profile[];
-	playerCount: number;
-	timeLimit: number;
-	loading?: boolean;
-	searchUsers?: (query: string) => Promise<Profile[]>;
-};
-
-// Violet accent colors
-const ACCENT = {
-	bg: "bg-[#8b5cf6]",
-	bgLight: "bg-[#8b5cf6]/10",
-	text: "text-[#a78bfa]",
-	border: "border-[#8b5cf6]",
-	focus: "focus:ring-[#8b5cf6]",
-};
+import { ACCENT, getLanguageDisplayName } from "../../constants";
+import type { InvitePlayersStepProps } from "../../types";
 
 const InvitePlayersStep = ({
 	selectedProblem,
@@ -69,8 +51,8 @@ const InvitePlayersStep = ({
 						player.username
 							?.toLowerCase()
 							.includes(searchQuery.toLowerCase()) ||
-						player.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
-			  );
+						player.full_name?.toLowerCase().includes(searchQuery.toLowerCase()),
+				);
 
 	// Handle player selection/deselection
 	const togglePlayerSelection = (player: Profile) => {
@@ -79,17 +61,6 @@ const InvitePlayersStep = ({
 		} else if (selectedPlayers.length < requiredPlayers) {
 			setSelectedPlayers([...selectedPlayers, player]);
 		}
-	};
-
-	const getLanguageDisplayName = (languageId: string): string => {
-		const languages: Record<string, string> = {
-			javascript: "JavaScript",
-			python: "Python",
-			typescript: "TypeScript",
-			java: "Java",
-			cpp: "C++",
-		};
-		return languages[languageId] || languageId;
 	};
 
 	const getInitials = (player: Profile) => {

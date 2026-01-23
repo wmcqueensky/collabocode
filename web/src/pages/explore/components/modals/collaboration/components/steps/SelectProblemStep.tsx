@@ -1,23 +1,8 @@
 import { useState } from "react";
 import { Search, Code, Loader2 } from "lucide-react";
-import type { Problem } from "../../../../../../../types/database";
 
-type SelectProblemStepProps = {
-	selectedProblem: Problem | null;
-	setSelectedProblem: (problem: Problem | null) => void;
-	problems: Problem[];
-	loading?: boolean;
-};
-
-// Violet accent colors
-const ACCENT = {
-	bg: "bg-[#8b5cf6]",
-	bgLight: "bg-[#8b5cf6]/20",
-	text: "text-[#a78bfa]",
-	border: "border-[#8b5cf6]",
-	ring: "ring-[#8b5cf6]",
-	focus: "focus:border-[#8b5cf6] focus:ring-[#8b5cf6]",
-};
+import { ACCENT, getDifficultyColor } from "../../constants";
+import type { SelectProblemStepProps } from "../../types";
 
 const SelectProblemStep = ({
 	selectedProblem,
@@ -41,19 +26,6 @@ const SelectProblemStep = ({
 
 		return matchesSearch && matchesDifficulty;
 	});
-
-	const getDifficultyColor = (difficulty: string) => {
-		switch (difficulty.toLowerCase()) {
-			case "easy":
-				return "bg-green-500/20 text-green-400";
-			case "medium":
-				return "bg-yellow-500/20 text-yellow-400";
-			case "hard":
-				return "bg-red-500/20 text-red-400";
-			default:
-				return "bg-gray-500/20 text-gray-400";
-		}
-	};
 
 	if (loading) {
 		return (
@@ -124,7 +96,7 @@ const SelectProblemStep = ({
 								<h4 className="font-medium text-white">{problem.title}</h4>
 								<span
 									className={`px-2 py-0.5 rounded text-xs font-medium ${getDifficultyColor(
-										problem.difficulty
+										problem.difficulty,
 									)}`}
 								>
 									{problem.difficulty}

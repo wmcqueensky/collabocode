@@ -1,37 +1,14 @@
 import { Clock, Code, Users, Rocket } from "lucide-react";
-import type { Problem } from "../../../../../../../types/database";
 
-type ConfigureSessionStepProps = {
-	selectedProblem: Problem | null;
-	selectedLanguage: string;
-	setSelectedLanguage: (language: string) => void;
-	timeLimit: number;
-	setTimeLimit: (limit: number) => void;
-	playerCount: number;
-	setPlayerCount: (count: number) => void;
-};
-
-const LANGUAGES = [
-	{ value: "javascript", label: "JavaScript" },
-	{ value: "typescript", label: "TypeScript" },
-	{ value: "python", label: "Python" },
-];
-
-const TIME_OPTIONS = [
-	{ value: 30, label: "30 min" },
-	{ value: 45, label: "45 min" },
-	{ value: 60, label: "60 min" },
-	{ value: 90, label: "90 min" },
-];
-
-// Violet accent colors
-const ACCENT = {
-	bg: "bg-[#8b5cf6]",
-	bgLight: "bg-[#8b5cf6]/20",
-	bgLighter: "bg-[#8b5cf6]/10",
-	text: "text-[#a78bfa]",
-	border: "border-[#8b5cf6]/30",
-};
+import {
+	ACCENT,
+	PROGRAMMING_LANGUAGES,
+	TIME_OPTIONS,
+	TEAM_SIZES,
+	getDifficultyColor,
+	getTeamSizeLabel,
+} from "../../constants";
+import type { ConfigureSessionStepProps } from "../../types";
 
 const ConfigureSessionStep = ({
 	selectedProblem,
@@ -42,19 +19,6 @@ const ConfigureSessionStep = ({
 	playerCount,
 	setPlayerCount,
 }: ConfigureSessionStepProps) => {
-	const getDifficultyColor = (difficulty: string) => {
-		switch (difficulty?.toLowerCase()) {
-			case "easy":
-				return "bg-green-500/20 text-green-400";
-			case "medium":
-				return "bg-yellow-500/20 text-yellow-400";
-			case "hard":
-				return "bg-red-500/20 text-red-400";
-			default:
-				return "bg-gray-500/20 text-gray-400";
-		}
-	};
-
 	return (
 		<div className="p-4 sm:p-6 space-y-5">
 			{/* Selected Problem Summary */}
@@ -71,7 +35,7 @@ const ConfigureSessionStep = ({
 							<div className="flex flex-wrap items-center gap-2 mt-1">
 								<span
 									className={`px-2 py-0.5 rounded-full text-xs ${getDifficultyColor(
-										selectedProblem.difficulty
+										selectedProblem.difficulty,
 									)}`}
 								>
 									{selectedProblem.difficulty}
@@ -97,7 +61,7 @@ const ConfigureSessionStep = ({
 					Programming Language
 				</label>
 				<div className="grid grid-cols-3 gap-2">
-					{LANGUAGES.map((lang) => (
+					{PROGRAMMING_LANGUAGES.map((lang) => (
 						<button
 							key={lang.value}
 							onClick={() => setSelectedLanguage(lang.value)}
@@ -143,7 +107,7 @@ const ConfigureSessionStep = ({
 					Team Size
 				</label>
 				<div className="grid grid-cols-3 gap-2">
-					{[2, 3, 4].map((count) => (
+					{TEAM_SIZES.map((count) => (
 						<button
 							key={count}
 							onClick={() => setPlayerCount(count)}
@@ -156,7 +120,7 @@ const ConfigureSessionStep = ({
 							<div className="flex flex-col items-center">
 								<span className="text-lg font-bold">{count}</span>
 								<span className="text-xs opacity-70">
-									{count === 2 ? "Pair" : count === 3 ? "Trio" : "Squad"}
+									{getTeamSizeLabel(count)}
 								</span>
 							</div>
 						</button>
