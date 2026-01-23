@@ -2,19 +2,9 @@
 import { useState, useEffect } from "react";
 import { Search, Users, Clock, Code, Check, Loader2 } from "lucide-react";
 import { supabase } from "../../../../../../../lib/supabase";
-import type { Problem, Profile } from "../../../../../../../types/database";
-
-type InvitePlayersStepProps = {
-	selectedProblem: Problem | null;
-	selectedLanguage: string;
-	selectedPlayers: Profile[];
-	setSelectedPlayers: (players: Profile[]) => void;
-	availablePlayers: Profile[];
-	playerCount: number;
-	timeLimit: number;
-	loading?: boolean;
-	searchUsers: (query: string) => Promise<Profile[]>;
-};
+import type { Profile } from "../../../../../../../types/database";
+import type { InvitePlayersStepProps } from "../../types";
+import { getLanguageDisplayName } from "../../constants";
 
 const InvitePlayersStep = ({
 	selectedProblem,
@@ -67,7 +57,7 @@ const InvitePlayersStep = ({
 				const onlineIds = new Set(
 					Object.values(state)
 						.flat()
-						.map((user: any) => user.user_id)
+						.map((user: any) => user.user_id),
 				);
 				setOnlineUsers(onlineIds);
 			})
@@ -95,14 +85,14 @@ const InvitePlayersStep = ({
 	// Filter out already selected players from display
 	const filteredPlayers = displayPlayers.filter(
 		(player: Profile) =>
-			!selectedPlayers.some((p: Profile) => p.id === player.id)
+			!selectedPlayers.some((p: Profile) => p.id === player.id),
 	);
 
 	// Handle player selection/deselection
 	const togglePlayerSelection = (player: Profile) => {
 		if (selectedPlayers.some((p: Profile) => p.id === player.id)) {
 			setSelectedPlayers(
-				selectedPlayers.filter((p: Profile) => p.id !== player.id)
+				selectedPlayers.filter((p: Profile) => p.id !== player.id),
 			);
 		} else {
 			// Only allow selection if we haven't reached the limit
@@ -110,26 +100,6 @@ const InvitePlayersStep = ({
 				setSelectedPlayers([...selectedPlayers, player]);
 			}
 		}
-	};
-
-	// Get programming language display name
-	const getLanguageDisplayName = (languageId: string): string => {
-		const languages: Record<string, string> = {
-			javascript: "JavaScript",
-			python: "Python",
-			java: "Java",
-			cpp: "C++",
-			csharp: "C#",
-			go: "Go",
-			ruby: "Ruby",
-			typescript: "TypeScript",
-			php: "PHP",
-			swift: "Swift",
-			kotlin: "Kotlin",
-			rust: "Rust",
-		};
-
-		return languages[languageId] || languageId;
 	};
 
 	return (
@@ -293,8 +263,8 @@ const InvitePlayersStep = ({
 									selectedPlayers.some((p: Profile) => p.id === player.id)
 										? "border-[#5bc6ca] bg-[#5bc6ca10]"
 										: selectedPlayers.length >= requiredPlayers
-										? "border-gray-700 bg-[#2a2a2a] opacity-50 cursor-not-allowed"
-										: "border-gray-700 bg-[#2a2a2a] hover:border-gray-500"
+											? "border-gray-700 bg-[#2a2a2a] opacity-50 cursor-not-allowed"
+											: "border-gray-700 bg-[#2a2a2a] hover:border-gray-500"
 								}`}
 								onClick={() => {
 									if (selectedPlayers.length < requiredPlayers) {
@@ -344,7 +314,7 @@ const InvitePlayersStep = ({
 										}`}
 									>
 										{selectedPlayers.some(
-											(p: Profile) => p.id === player.id
+											(p: Profile) => p.id === player.id,
 										) && <Check size={14} className="text-black" />}
 									</div>
 								</div>

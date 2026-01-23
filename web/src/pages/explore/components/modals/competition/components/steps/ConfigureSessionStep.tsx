@@ -1,14 +1,11 @@
 import { Clock, Users, Code } from "lucide-react";
-
-type ConfigureSessionStepProps = {
-	selectedProblem: any;
-	selectedLanguage: string;
-	setSelectedLanguage: (lang: string) => void;
-	timeLimit: number;
-	setTimeLimit: (n: number) => void;
-	playerCount: number;
-	setPlayerCount: (n: number) => void;
-};
+import type { ConfigureSessionStepProps } from "../../types";
+import {
+	PROGRAMMING_LANGUAGES,
+	AVAILABLE_TIME_LIMITS,
+	AVAILABLE_PLAYER_COUNTS,
+	getDifficultyColor,
+} from "../../constants";
 
 const ConfigureSessionStep = ({
 	selectedProblem,
@@ -19,38 +16,6 @@ const ConfigureSessionStep = ({
 	playerCount,
 	setPlayerCount,
 }: ConfigureSessionStepProps) => {
-	const programmingLanguages = [
-		{ id: "javascript", name: "JavaScript" },
-		{ id: "python", name: "Python" },
-		{ id: "java", name: "Java" },
-		{ id: "cpp", name: "C++" },
-		{ id: "csharp", name: "C#" },
-		{ id: "go", name: "Go" },
-		{ id: "ruby", name: "Ruby" },
-		{ id: "typescript", name: "TypeScript" },
-		{ id: "php", name: "PHP" },
-		{ id: "swift", name: "Swift" },
-		{ id: "kotlin", name: "Kotlin" },
-		{ id: "rust", name: "Rust" },
-	];
-
-	const availableTimeLimits = [3, 5, 10, 15, 30, 60];
-	const availablePlayerCounts = [2, 3, 4];
-
-	const getDifficultyColor = (difficulty: any) => {
-		if (!difficulty) return "text-gray-500";
-		switch (String(difficulty).toLowerCase()) {
-			case "easy":
-				return "text-green-500";
-			case "medium":
-				return "text-yellow-500";
-			case "hard":
-				return "text-red-500";
-			default:
-				return "text-gray-500";
-		}
-	};
-
 	if (!selectedProblem) {
 		return (
 			<div className="p-6 flex items-center justify-center h-64">
@@ -71,7 +36,7 @@ const ConfigureSessionStep = ({
 				</h3>
 				<p
 					className={`text-sm font-medium mt-1 ${getDifficultyColor(
-						selectedProblem?.difficulty
+						selectedProblem?.difficulty,
 					)}`}
 				>
 					{selectedProblem?.difficulty || "N/A"}
@@ -90,7 +55,7 @@ const ConfigureSessionStep = ({
 						<h4>Time Limit</h4>
 					</div>
 					<div className="grid grid-cols-3 gap-2">
-						{availableTimeLimits.map((time) => (
+						{AVAILABLE_TIME_LIMITS.map((time) => (
 							<button
 								key={time}
 								className={`py-2 px-1 rounded-md text-center transition ${
@@ -116,7 +81,7 @@ const ConfigureSessionStep = ({
 						<h4>Number of Players</h4>
 					</div>
 					<div className="grid grid-cols-3 gap-2">
-						{availablePlayerCounts.map((count) => (
+						{AVAILABLE_PLAYER_COUNTS.map((count) => (
 							<button
 								key={count}
 								className={`py-2 px-1 rounded-md text-center transition ${
@@ -147,7 +112,7 @@ const ConfigureSessionStep = ({
 						onChange={(e) => setSelectedLanguage(e.target.value)}
 						className="w-full bg-[#3a3a3a] border border-gray-700 rounded-md py-2 px-3 text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5bc6ca]"
 					>
-						{programmingLanguages.map((lang) => (
+						{PROGRAMMING_LANGUAGES.map((lang) => (
 							<option key={lang.id} value={lang.id}>
 								{lang.name}
 							</option>
@@ -181,7 +146,7 @@ const ConfigureSessionStep = ({
 						<span className="text-gray-400">Difficulty:</span>
 						<span
 							className={`ml-2 ${getDifficultyColor(
-								selectedProblem?.difficulty
+								selectedProblem?.difficulty,
 							)}`}
 						>
 							{selectedProblem?.difficulty || "N/A"}
@@ -191,7 +156,7 @@ const ConfigureSessionStep = ({
 						<span className="text-gray-400">Language:</span>
 						<span className="text-white ml-2">
 							{
-								programmingLanguages.find((l) => l.id === selectedLanguage)
+								PROGRAMMING_LANGUAGES.find((l) => l.id === selectedLanguage)
 									?.name
 							}
 						</span>

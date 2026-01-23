@@ -1,15 +1,5 @@
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
-
-type ModalFooterProps = {
-	step: number;
-	totalSteps?: number;
-	setStep: (n: number) => void;
-	onClose: () => void;
-	startAction?: () => void;
-	startActionText?: string;
-	canContinue?: boolean;
-	canStart?: boolean;
-};
+import type { ModalFooterProps } from "../../types";
 
 const ModalFooter = ({
 	step,

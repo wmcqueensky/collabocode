@@ -2,13 +2,8 @@
 import { useState, useEffect } from "react";
 import { Code, Search, Star, Loader2 } from "lucide-react";
 import type { Problem } from "../../../../../../../types/database";
-
-type SelectLeetCodeProblemStepProps = {
-	selectedProblem: Problem | null;
-	setSelectedProblem: (p: Problem | null) => void;
-	problems: Problem[];
-	loading?: boolean;
-};
+import type { SelectLeetCodeProblemStepProps } from "../../types";
+import { getDifficultyBadgeColor } from "../../constants";
 
 const SelectLeetCodeProblemStep = ({
 	selectedProblem,
@@ -40,21 +35,8 @@ const SelectLeetCodeProblemStep = ({
 
 	// Get all unique tags from problems
 	const allTags = Array.from(
-		new Set(problems.flatMap((problem: Problem) => problem.tags || []))
+		new Set(problems.flatMap((problem: Problem) => problem.tags || [])),
 	).sort();
-
-	const difficultyBadgeColor = (difficulty: string) => {
-		switch ((difficulty || "").toLowerCase()) {
-			case "easy":
-				return "bg-green-600 text-white";
-			case "medium":
-				return "bg-yellow-600 text-white";
-			case "hard":
-				return "bg-red-600 text-white";
-			default:
-				return "bg-gray-600 text-white";
-		}
-	};
 
 	// Reset search when problems change
 	useEffect(() => {
@@ -182,8 +164,8 @@ const SelectLeetCodeProblemStep = ({
 											</div>
 										</div>
 										<span
-											className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ml-2 ${difficultyBadgeColor(
-												problem.difficulty
+											className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ml-2 ${getDifficultyBadgeColor(
+												problem.difficulty,
 											)}`}
 										>
 											{problem.difficulty}

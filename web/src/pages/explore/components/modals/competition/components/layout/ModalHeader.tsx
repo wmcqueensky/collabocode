@@ -1,10 +1,5 @@
 import { X } from "lucide-react";
-
-type ModalHeaderProps = {
-	icon?: React.ReactNode;
-	title?: React.ReactNode;
-	onClose?: () => void;
-};
+import type { ModalHeaderProps } from "../../types";
 
 const ModalHeader = ({ icon, title, onClose }: ModalHeaderProps) => {
 	return (
