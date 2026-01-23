@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React from "react";
 import {
 	Users,
 	Clock,
@@ -8,160 +8,70 @@ import {
 	Loader2,
 	Rocket,
 } from "lucide-react";
-import { supabase } from "../../../lib/supabase";
 import type { Session, SessionParticipant } from "../../../types/database";
 
 interface WaitingLobbyProps {
 	session: Session;
 	participants: SessionParticipant[];
 	currentUserId: string;
+	timeElapsed: number;
+	isHost: boolean;
+	canStart: boolean;
+	joinedCount: number;
+	invitedCount: number;
+	declinedCount: number;
+	allPlayersJoined: boolean;
 	onStartSession?: () => void;
 }
 
-export const WaitingLobby = ({
+// Helper function to format time
+const formatTime = (seconds: number) => {
+	const mins = Math.floor(seconds / 60);
+	const secs = seconds % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+// Get participant status icon
+const getStatusIcon = (status: string) => {
+	switch (status) {
+		case "joined":
+			return <CheckCircle size={20} className="text-green-500" />;
+		case "declined":
+			return <XCircle size={20} className="text-red-500" />;
+		case "invited":
+			return <Loader2 size={20} className="text-yellow-500 animate-spin" />;
+		default:
+			return <Users size={20} className="text-gray-500" />;
+	}
+};
+
+// Get status text
+const getStatusText = (status: string) => {
+	switch (status) {
+		case "joined":
+			return <span className="text-green-500">Ready</span>;
+		case "declined":
+			return <span className="text-red-500">Declined</span>;
+		case "invited":
+			return <span className="text-yellow-500">Waiting...</span>;
+		default:
+			return <span className="text-gray-500">Pending</span>;
+	}
+};
+
+export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 	session,
-	participants: initialParticipants,
+	participants,
 	currentUserId,
+	timeElapsed,
+	isHost,
+	canStart,
+	joinedCount,
+	invitedCount,
+	declinedCount,
+	allPlayersJoined,
 	onStartSession,
-}: WaitingLobbyProps) => {
-	const [timeElapsed, setTimeElapsed] = useState(0);
-	const [participants, setParticipants] =
-		useState<SessionParticipant[]>(initialParticipants);
-	const [sessionStatus, setSessionStatus] = useState(session.status);
-
-	// Update participants when prop changes
-	useEffect(() => {
-		setParticipants(initialParticipants);
-	}, [initialParticipants]);
-
-	// Real-time subscription for participant updates
-	useEffect(() => {
-		if (!session.id) return;
-
-		// Subscribe to participant changes
-		const participantChannel = supabase
-			.channel(`waiting-lobby-participants:${session.id}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "session_participants",
-					filter: `session_id=eq.${session.id}`,
-				},
-				async (payload) => {
-					console.log("[WaitingLobby] Participant update:", payload);
-
-					// Refetch all participants to get user data
-					const { data: updatedParticipants } = await supabase
-						.from("session_participants")
-						.select(
-							`
-							*,
-							user:profiles(id, username, avatar_url, rating, problems_solved)
-						`,
-						)
-						.eq("session_id", session.id);
-
-					if (updatedParticipants) {
-						setParticipants(updatedParticipants as SessionParticipant[]);
-					}
-				},
-			)
-			.subscribe((status) => {
-				console.log("[WaitingLobby] Participant subscription:", status);
-			});
-
-		// Subscribe to session status changes
-		const sessionChannel = supabase
-			.channel(`waiting-lobby-session:${session.id}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "UPDATE",
-					schema: "public",
-					table: "sessions",
-					filter: `id=eq.${session.id}`,
-				},
-				(payload) => {
-					console.log("[WaitingLobby] Session update:", payload);
-					const updatedSession = payload.new as Session;
-					setSessionStatus(updatedSession.status);
-
-					// If session started, trigger navigation
-					if (updatedSession.status === "in_progress") {
-						// Force page reload to enter the session
-						window.location.reload();
-					}
-				},
-			)
-			.subscribe((status) => {
-				console.log("[WaitingLobby] Session subscription:", status);
-			});
-
-		return () => {
-			supabase.removeChannel(participantChannel);
-			supabase.removeChannel(sessionChannel);
-		};
-	}, [session.id]);
-
-	// Timer for elapsed time
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setTimeElapsed((prev) => prev + 1);
-		}, 1000);
-
-		return () => clearInterval(interval);
-	}, []);
-
-	// Format elapsed time
-	const formatTime = (seconds: number) => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, "0")}`;
-	};
-
-	// Count participants by status
-	const joinedCount = participants.filter((p) => p.status === "joined").length;
-	const invitedCount = participants.filter(
-		(p) => p.status === "invited",
-	).length;
-	const declinedCount = participants.filter(
-		(p) => p.status === "declined",
-	).length;
-
-	const isHost = session.host_id === currentUserId;
-	const allPlayersJoined = joinedCount === session.max_players;
-	const canStart = isHost && joinedCount >= 2; // At least 2 collaborators including host
-
-	// Get participant status icon
-	const getStatusIcon = (status: string) => {
-		switch (status) {
-			case "joined":
-				return <CheckCircle size={20} className="text-green-500" />;
-			case "declined":
-				return <XCircle size={20} className="text-red-500" />;
-			case "invited":
-				return <Loader2 size={20} className="text-yellow-500 animate-spin" />;
-			default:
-				return <Users size={20} className="text-gray-500" />;
-		}
-	};
-
-	// Get status text
-	const getStatusText = (status: string) => {
-		switch (status) {
-			case "joined":
-				return <span className="text-green-500">Ready</span>;
-			case "declined":
-				return <span className="text-red-500">Declined</span>;
-			case "invited":
-				return <span className="text-yellow-500">Waiting...</span>;
-			default:
-				return <span className="text-gray-500">Pending</span>;
-		}
-	};
-
+}) => {
 	return (
 		<div className="min-h-screen bg-[#171717] flex items-center justify-center p-4">
 			<div className="max-w-4xl w-full">
@@ -417,3 +327,5 @@ export const WaitingLobby = ({
 		</div>
 	);
 };
+
+export default WaitingLobby;

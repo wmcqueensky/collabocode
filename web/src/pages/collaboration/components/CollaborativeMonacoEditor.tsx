@@ -52,7 +52,7 @@ export const CollaborativeMonacoEditor = ({
 				setupBinding(editor);
 			}
 		},
-		[collaborationDoc, userId, file.content]
+		[collaborationDoc, userId, file.content],
 	);
 
 	// Set up Yjs binding
@@ -71,7 +71,7 @@ export const CollaborativeMonacoEditor = ({
 				editor,
 				ytext,
 				collaborationDoc.awareness,
-				userId
+				userId,
 			);
 
 			// Set initial content if Yjs doc is empty
@@ -85,7 +85,7 @@ export const CollaborativeMonacoEditor = ({
 			// Track remote cursors for UI display
 			collaborationDoc.awareness.on("change", () => {
 				const cursors: RemoteCursor[] = [];
-				collaborationDoc.awareness?.getStates().forEach((state, clientId) => {
+				collaborationDoc.awareness?.getStates().forEach((state) => {
 					const userState = state as UserAwareness;
 					if (
 						userState.user?.id !== userId &&
@@ -104,7 +104,7 @@ export const CollaborativeMonacoEditor = ({
 				setRemoteCursors(cursors);
 			});
 		},
-		[collaborationDoc, userId, file.content]
+		[collaborationDoc, userId, file.content],
 	);
 
 	// Set up binding when collaboration doc becomes available
@@ -128,7 +128,7 @@ export const CollaborativeMonacoEditor = ({
 				onContentChange(value);
 			}
 		},
-		[onContentChange]
+		[onContentChange],
 	);
 
 	// Get Monaco language from file extension

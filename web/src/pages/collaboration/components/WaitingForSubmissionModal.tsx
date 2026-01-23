@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React from "react";
 import { Clock, CheckCircle, Loader2, Home } from "lucide-react";
 import type { SessionParticipant } from "../../../types/database";
 
@@ -7,103 +6,50 @@ interface WaitingForSubmissionModalProps {
 	isOpen: boolean;
 	participants: SessionParticipant[];
 	currentUserId: string;
-	onAllSubmitted?: () => void;
+	elapsedTime: number;
+	redirectCountdown: number | null;
+	readyCount: number;
+	submittedCount: number;
+	allReady: boolean;
+	allSubmitted: boolean;
+	onLeave: () => void;
 }
 
-export const WaitingForSubmissionModal = ({
+// Helper function to format time
+const formatTime = (seconds: number) => {
+	const mins = Math.floor(seconds / 60);
+	const secs = seconds % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+// Helper to get participant status
+const getParticipantStatus = (participant: SessionParticipant) => {
+	const testResults = participant.test_results as any;
+	if (testResults?.final_submission) {
+		return "submitted";
+	} else if (testResults?.ready_to_submit || participant.submission_time) {
+		return "ready";
+	}
+	return "working";
+};
+
+export const WaitingForSubmissionModal: React.FC<
+	WaitingForSubmissionModalProps
+> = ({
 	isOpen,
 	participants,
 	currentUserId,
-	onAllSubmitted,
-}: WaitingForSubmissionModalProps) => {
-	const navigate = useNavigate();
-	const [elapsedTime, setElapsedTime] = useState(0);
-	const [redirectCountdown, setRedirectCountdown] = useState<number | null>(
-		null
-	);
-
-	// Timer for elapsed time
-	useEffect(() => {
-		if (!isOpen) {
-			setElapsedTime(0);
-			setRedirectCountdown(null);
-			return;
-		}
-
-		const interval = setInterval(() => {
-			setElapsedTime((prev) => prev + 1);
-		}, 1000);
-
-		return () => clearInterval(interval);
-	}, [isOpen]);
-
-	// Check if all participants are ready to submit
-	const joinedParticipants = participants.filter((p) => p.status === "joined");
-
-	// Check for ready_to_submit flag in test_results (new way)
-	// or fall back to submission_time (old way for backward compatibility)
-	const readyCount = joinedParticipants.filter((p) => {
-		const testResults = p.test_results as any;
-		return testResults?.ready_to_submit || p.submission_time;
-	}).length;
-
-	// Check if all have final_submission (actual code submitted)
-	const submittedCount = joinedParticipants.filter((p) => {
-		const testResults = p.test_results as any;
-		return testResults?.final_submission;
-	}).length;
-
-	const allReady =
-		readyCount === joinedParticipants.length && joinedParticipants.length > 0;
-	const allSubmitted =
-		submittedCount === joinedParticipants.length &&
-		joinedParticipants.length > 0;
-
-	// Handle redirect countdown when all submitted
-	useEffect(() => {
-		if (allSubmitted && redirectCountdown === null) {
-			setRedirectCountdown(3);
-		}
-	}, [allSubmitted, redirectCountdown]);
-
-	// Countdown effect
-	useEffect(() => {
-		if (redirectCountdown === null) return;
-
-		if (redirectCountdown === 0) {
-			if (onAllSubmitted) {
-				onAllSubmitted();
-			} else {
-				navigate("/explore");
-			}
-			return;
-		}
-
-		const timer = setTimeout(() => {
-			setRedirectCountdown((prev) => (prev !== null ? prev - 1 : null));
-		}, 1000);
-
-		return () => clearTimeout(timer);
-	}, [redirectCountdown, onAllSubmitted, navigate]);
-
+	elapsedTime,
+	redirectCountdown,
+	readyCount,
+	submittedCount: _submittedCount,
+	allReady,
+	allSubmitted,
+	onLeave,
+}) => {
 	if (!isOpen) return null;
 
-	const formatTime = (seconds: number) => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, "0")}`;
-	};
-
-	// Helper to get participant status
-	const getParticipantStatus = (participant: SessionParticipant) => {
-		const testResults = participant.test_results as any;
-		if (testResults?.final_submission) {
-			return "submitted";
-		} else if (testResults?.ready_to_submit || participant.submission_time) {
-			return "ready";
-		}
-		return "working";
-	};
+	const joinedParticipants = participants.filter((p) => p.status === "joined");
 
 	return (
 		<div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -166,8 +112,8 @@ export const WaitingForSubmissionModal = ({
 								allSubmitted
 									? "bg-green-500"
 									: allReady
-									? "bg-blue-500"
-									: "bg-gradient-to-r from-purple-500 to-purple-600"
+										? "bg-blue-500"
+										: "bg-gradient-to-r from-purple-500 to-purple-600"
 							}`}
 							style={{
 								width: `${
@@ -199,8 +145,8 @@ export const WaitingForSubmissionModal = ({
 											status === "submitted"
 												? "bg-green-500 text-white"
 												: status === "ready"
-												? "bg-blue-500 text-white"
-												: "bg-gray-600 text-gray-300"
+													? "bg-blue-500 text-white"
+													: "bg-gray-600 text-gray-300"
 										}`}
 									>
 										{participant.user?.username?.charAt(0).toUpperCase() || "?"}
@@ -247,7 +193,7 @@ export const WaitingForSubmissionModal = ({
 
 					{!allSubmitted && (
 						<button
-							onClick={() => navigate("/explore")}
+							onClick={onLeave}
 							className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded transition"
 						>
 							<Home size={14} />

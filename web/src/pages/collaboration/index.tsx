@@ -1,9 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import * as Y from "yjs";
-import { Awareness } from "y-protocols/awareness";
 import {
-	Users,
 	Clock,
 	Code,
 	Play,
@@ -25,655 +20,68 @@ import { ProblemPanel } from "./components/ProblemPanel";
 import CollaborativeMonacoEditor from "./components/CollaborativeMonacoEditor";
 import WaitingForSubmissionModal from "./components/WaitingForSubmissionModal";
 
-// Services
-import { supabase } from "../../lib/supabase";
-import { sessionService } from "../../services/sessionService";
-import { executeCode } from "../../services/judge0Service";
-import { SupabaseYjsProvider } from "../../services/yjs/supabaseYjsProvider";
-import {
-	getUserColor,
-	type UserAwareness,
-	type CollaborationDocument,
-} from "../../services/yjs/collaborationDocument";
+// Hooks
+import { useCollaborationPage } from "./hooks/useCollaborationPage";
+import { useChatPanel } from "./hooks/useChatPanel";
+import { useWaitingLobby } from "./hooks/useWaitingLobby";
+import { useWaitingForSubmissionModal } from "./hooks/useWaitingForSubmissionModal";
 
-// Types
-import type { Session, SessionParticipant } from "../../types/database";
-
-interface TestCase {
-	input: any;
-	output: any;
-	result?: string;
-	status: "pending" | "pass" | "fail" | "running";
-}
-
-/**
- * Adapter class that wraps SupabaseYjsProvider to match CollaborationDocument interface
- */
-class CollaborationDocumentAdapter implements CollaborationDocument {
-	public readonly provider: SupabaseYjsProvider;
-	public readonly sessionId: string;
-	public readonly fileId: string;
-	private _isConnected: boolean = false;
-
-	constructor(
-		provider: SupabaseYjsProvider,
-		sessionId: string,
-		fileId: string = "main",
-	) {
-		this.provider = provider;
-		this.sessionId = sessionId;
-		this.fileId = fileId;
-	}
-
-	get ydoc(): Y.Doc {
-		return this.provider.doc;
-	}
-
-	get awareness(): Awareness {
-		return this.provider.awareness;
-	}
-
-	getText(): Y.Text {
-		return this.provider.doc.getText("content");
-	}
-
-	connect(): void {
-		this._isConnected = true;
-	}
-
-	disconnect(): void {
-		this.provider.destroy();
-		this._isConnected = false;
-	}
-
-	isConnected(): boolean {
-		return this._isConnected;
-	}
-
-	updateCursor(cursor: { lineNumber: number; column: number } | null): void {
-		const localState = this.provider.awareness.getLocalState() as UserAwareness;
-		this.provider.setLocalState({
-			...localState,
-			cursor,
-		});
-	}
-}
+// Constants
+import { LOW_TIME_THRESHOLD } from "./constants";
 
 export default function CollaborationPage() {
-	const { sessionId } = useParams<{ sessionId: string }>();
-	const navigate = useNavigate();
-
-	// Session state
-	const [session, setSession] = useState<Session | null>(null);
-	const [participants, setParticipants] = useState<SessionParticipant[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [currentUserId, setCurrentUserId] = useState<string>("");
-	const [currentUserName, setCurrentUserName] = useState<string>("");
-	const [showWaitingLobby, setShowWaitingLobby] = useState(true);
-
-	// Timer state
-	const [seconds, setSeconds] = useState(0);
-	const [timeStr, setTimeStr] = useState("00:00");
-
-	// Yjs Collaboration state
-	const yjsProviderRef = useRef<SupabaseYjsProvider | null>(null);
-	const [collaborationDoc, setCollaborationDoc] =
-		useState<CollaborationDocument | null>(null);
-	const [isYjsConnected, setIsYjsConnected] = useState(false);
-	const [remoteCursors, setRemoteCursors] = useState<
-		Map<number, UserAwareness>
-	>(new Map());
-
-	// Editor state
-	const [starterCode, setStarterCode] = useState<string>("");
-	const [output, setOutput] = useState<
-		Array<{ message: string; status: string }>
-	>([{ message: "// Console output will appear here", status: "normal" }]);
-	const [testCases, setTestCases] = useState<TestCase[]>([]);
-
-	// UI state
-	const [isChatOpen, setIsChatOpen] = useState(true);
-	const [isMicOn, setIsMicOn] = useState(false);
-	const [activeProblemTab, setActiveProblemTab] = useState("description");
-	const [mobileView, setMobileView] = useState<"code" | "problem" | "chat">(
-		"code",
-	);
-	const [isMobile, setIsMobile] = useState(false);
-
-	// Submission state
-	// "hasClickedSubmit" = user clicked submit, waiting for others
-	// "hasSubmitted" = final code captured and evaluated
-	const [hasClickedSubmit, setHasClickedSubmit] = useState(false);
-	const [hasSubmitted, setHasSubmitted] = useState(false);
-	const [showWaitingModal, setShowWaitingModal] = useState(false);
-	const [isProcessingFinalSubmission, setIsProcessingFinalSubmission] =
-		useState(false);
-
-	// Check screen size
-	useEffect(() => {
-		const checkScreenSize = () => {
-			const mobile = window.innerWidth < 768;
-			setIsMobile(mobile);
-			if (mobile) {
-				setIsChatOpen(false);
-			} else {
-				setIsChatOpen(true);
-			}
-		};
-
-		checkScreenSize();
-		window.addEventListener("resize", checkScreenSize);
-		return () => window.removeEventListener("resize", checkScreenSize);
-	}, []);
-
-	// Load current user
-	useEffect(() => {
-		const loadUser = async () => {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (user) {
-				setCurrentUserId(user.id);
-
-				const { data: profile } = await supabase
-					.from("profiles")
-					.select("username")
-					.eq("id", user.id)
-					.single();
-
-				setCurrentUserName(
-					profile?.username || user.email?.split("@")[0] || "User",
-				);
-			} else {
-				navigate("/explore");
-			}
-		};
-		loadUser();
-	}, [navigate]);
-
-	// Load session data
-	useEffect(() => {
-		if (!sessionId || !currentUserId) return;
-
-		const loadSession = async () => {
-			try {
-				setLoading(true);
-
-				const sessionData = await sessionService.getSessionById(sessionId);
-				if (!sessionData) {
-					setError("Session not found");
-					return;
-				}
-
-				if (sessionData.type !== "collaboration") {
-					navigate(`/match/${sessionId}`);
-					return;
-				}
-
-				setSession(sessionData);
-
-				const participantsData =
-					await sessionService.getSessionParticipants(sessionId);
-				setParticipants(participantsData);
-
-				// Check if current user has already marked ready_to_submit
-				const currentParticipant = participantsData.find(
-					(p) => p.user_id === currentUserId,
-				);
-				if (currentParticipant?.submission_time) {
-					const testResults = currentParticipant.test_results as any;
-					if (testResults?.ready_to_submit && !testResults?.final_submission) {
-						setHasClickedSubmit(true);
-						setShowWaitingModal(true);
-					} else if (testResults?.final_submission) {
-						setHasSubmitted(true);
-						setShowWaitingModal(true);
-					}
-				}
-
-				if (sessionData.status === "in_progress") {
-					setShowWaitingLobby(false);
-				} else if (sessionData.status === "completed") {
-					navigate(`/collaboration-summary/${sessionId}`);
-					return;
-				}
-
-				if (sessionData.problem?.test_cases) {
-					const cases = sessionData.problem.test_cases.map((tc: any) => ({
-						input: tc.input,
-						output: tc.output,
-						status: "pending" as const,
-					}));
-					setTestCases(cases);
-				}
-
-				if (sessionData.problem?.starter_code) {
-					const code =
-						sessionData.problem.starter_code[sessionData.language] ||
-						sessionData.problem.starter_code.javascript ||
-						"// Start coding here";
-					setStarterCode(code);
-				}
-			} catch (err: any) {
-				console.error("Error loading session:", err);
-				setError(err.message || "Failed to load session");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		loadSession();
-	}, [sessionId, currentUserId, navigate]);
-
-	// Initialize Yjs provider
-	useEffect(() => {
-		if (
-			!sessionId ||
-			!currentUserId ||
-			!currentUserName ||
-			showWaitingLobby ||
-			!session
-		) {
-			return;
-		}
-
-		const roomName = `collab-${sessionId}`;
-		const doc = new Y.Doc();
-
-		const provider = new SupabaseYjsProvider(roomName, doc, currentUserId);
-
-		const colors = getUserColor(currentUserId);
-		provider.setLocalState({
-			user: {
-				id: currentUserId,
-				name: currentUserName,
-				color: colors.color,
-				colorLight: colors.light,
-			},
-			cursor: null,
-		});
-
-		provider.onSync(() => {
-			console.log(`[Yjs] Synced for collaboration session: ${sessionId}`);
-			setIsYjsConnected(true);
-
-			const ytext = provider.doc.getText("content");
-			if (ytext.toString() === "" && starterCode) {
-				ytext.insert(0, starterCode);
-			}
-
-			const adapter = new CollaborationDocumentAdapter(
-				provider,
-				sessionId,
-				"main",
-			);
-			adapter.connect();
-			setCollaborationDoc(adapter);
-		});
-
-		provider.onAwarenessChange((states) => {
-			setRemoteCursors(states);
-		});
-
-		yjsProviderRef.current = provider;
-
-		return () => {
-			provider.destroy();
-			yjsProviderRef.current = null;
-			setCollaborationDoc(null);
-		};
-	}, [
+	// Main page hook
+	const {
 		sessionId,
+		session,
+		participants,
+		loading,
+		error,
 		currentUserId,
-		currentUserName,
 		showWaitingLobby,
-		session,
-		starterCode,
-	]);
-
-	// Get current code from Yjs document
-	const getCurrentCode = useCallback((): string => {
-		if (yjsProviderRef.current) {
-			return yjsProviderRef.current.doc.getText("content").toString();
-		}
-		return starterCode;
-	}, [starterCode]);
-
-	// Process final submission when all players are ready
-	const processFinalSubmission = useCallback(async () => {
-		if (!sessionId || !session || isProcessingFinalSubmission || hasSubmitted)
-			return;
-
-		setIsProcessingFinalSubmission(true);
-		console.log("Processing final submission for all players...");
-
-		try {
-			// Get the FINAL code from Yjs (shared, latest version)
-			const finalCode = getCurrentCode();
-
-			// Run tests on the final code
-			const results = await Promise.all(
-				testCases.map(async (testCase) => {
-					try {
-						const result = await executeCode(
-							finalCode,
-							session.language,
-							JSON.stringify(testCase.input),
-						);
-						return (
-							result.status === "success" &&
-							result.output?.trim() === JSON.stringify(testCase.output)
-						);
-					} catch {
-						return false;
-					}
-				}),
-			);
-
-			const allPassed = results.every((r) => r);
-			const passedCount = results.filter((r) => r).length;
-
-			// Update current user's record with final submission
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-
-			if (user) {
-				await supabase
-					.from("session_participants")
-					.update({
-						code_snapshot: finalCode,
-						is_correct: allPassed,
-						test_results: {
-							passedCount,
-							totalCount: results.length,
-							results,
-							ready_to_submit: true,
-							final_submission: true,
-						},
-					})
-					.eq("session_id", sessionId)
-					.eq("user_id", user.id);
-			}
-
-			setHasSubmitted(true);
-
-			setOutput([
-				{ message: "✓ Team solution submitted successfully!", status: "pass" },
-				{
-					message: `${passedCount}/${results.length} test cases passed`,
-					status: allPassed ? "pass" : "fail",
-				},
-			]);
-		} catch (err: any) {
-			console.error("Error processing final submission:", err);
-			setOutput([
-				{ message: "Error submitting solution", status: "fail" },
-				{ message: err.message || "Unknown error", status: "fail" },
-			]);
-		} finally {
-			setIsProcessingFinalSubmission(false);
-		}
-	}, [
-		sessionId,
-		session,
-		isProcessingFinalSubmission,
-		hasSubmitted,
-		getCurrentCode,
+		seconds,
+		timeStr,
+		collaborationDoc,
+		isYjsConnected,
+		remoteCursors,
+		output,
 		testCases,
-	]);
-
-	// Subscribe to real-time participant updates
-	useEffect(() => {
-		if (!sessionId || showWaitingLobby) return;
-
-		const participantChannel = supabase
-			.channel(`collaboration-participants:${sessionId}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "session_participants",
-					filter: `session_id=eq.${sessionId}`,
-				},
-				async () => {
-					const updated =
-						await sessionService.getSessionParticipants(sessionId);
-					setParticipants(updated);
-
-					// Check if all participants are now ready to submit
-					const joinedParticipants = updated.filter(
-						(p) => p.status === "joined",
-					);
-					const allReadyToSubmit = joinedParticipants.every((p) => {
-						const testResults = p.test_results as any;
-						return (
-							testResults?.ready_to_submit || testResults?.final_submission
-						);
-					});
-
-					// If all ready and we clicked submit but haven't processed final yet
-					if (
-						allReadyToSubmit &&
-						joinedParticipants.length > 0 &&
-						hasClickedSubmit &&
-						!hasSubmitted &&
-						!isProcessingFinalSubmission
-					) {
-						console.log("All participants ready - processing final submission");
-						await processFinalSubmission();
-					}
-				},
-			)
-			.subscribe();
-
-		const sessionChannel = supabase
-			.channel(`collaboration-session:${sessionId}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "UPDATE",
-					schema: "public",
-					table: "sessions",
-					filter: `id=eq.${sessionId}`,
-				},
-				(payload) => {
-					const updated = payload.new as Session;
-					setSession((prev) => (prev ? { ...prev, ...updated } : null));
-
-					if (updated.status === "completed") {
-						navigate(`/collaboration-summary/${sessionId}`);
-					}
-				},
-			)
-			.subscribe();
-
-		return () => {
-			supabase.removeChannel(participantChannel);
-			supabase.removeChannel(sessionChannel);
-		};
-	}, [
-		sessionId,
-		showWaitingLobby,
-		navigate,
+		isChatOpen,
+		isMicOn,
+		activeProblemTab,
+		mobileView,
+		isMobile,
 		hasClickedSubmit,
 		hasSubmitted,
-		isProcessingFinalSubmission,
-		processFinalSubmission,
-	]);
+		showWaitingModal,
+		handleStartSession,
+		handleRun,
+		handleSubmit,
+		handleAllSubmitted,
+		toggleChat,
+		toggleMic,
+		setActiveProblemTab,
+		setMobileView,
+		getFileInfo,
+		navigate,
+	} = useCollaborationPage();
 
-	// Timer effect
-	useEffect(() => {
-		if (!session || showWaitingLobby || !session.started_at) return;
+	// Chat panel hook
+	const chatPanel = useChatPanel({ sessionId });
 
-		const startTime = new Date(session.started_at).getTime();
-		const totalTime = session.time_limit * 60 * 1000;
+	// Waiting lobby hook (only used when showWaitingLobby is true)
+	const waitingLobby = useWaitingLobby({
+		session,
+		initialParticipants: participants,
+		currentUserId,
+	});
 
-		const updateTimer = () => {
-			const elapsed = Date.now() - startTime;
-			const remaining = Math.max(0, totalTime - elapsed);
-			const remainingSeconds = Math.floor(remaining / 1000);
-
-			setSeconds(remainingSeconds);
-			const mins = Math.floor(remainingSeconds / 60);
-			const secs = remainingSeconds % 60;
-			setTimeStr(`${mins}:${secs.toString().padStart(2, "0")}`);
-
-			if (remainingSeconds === 0 && !hasClickedSubmit) {
-				handleSubmit();
-			}
-		};
-
-		updateTimer();
-		const interval = setInterval(updateTimer, 1000);
-		return () => clearInterval(interval);
-	}, [session, showWaitingLobby, hasClickedSubmit]);
-
-	// Handle start session
-	const handleStartSession = async () => {
-		if (!session || !sessionId) return;
-
-		try {
-			await sessionService.updateSessionStatus(sessionId, "in_progress");
-
-			const updatedSession = await sessionService.getSessionById(sessionId);
-			if (updatedSession) {
-				setSession(updatedSession);
-			}
-
-			setShowWaitingLobby(false);
-		} catch (err: any) {
-			console.error("Error starting session:", err);
-			setError(err.message || "Failed to start session");
-		}
-	};
-
-	// Handle run code
-	const handleRun = async () => {
-		if (!session) {
-			setOutput([{ message: "No session loaded", status: "fail" }]);
-			return;
-		}
-
-		const code = getCurrentCode();
-		setOutput([{ message: "Running code...", status: "normal" }]);
-
-		try {
-			const results = await Promise.all(
-				testCases.map(async (testCase) => {
-					try {
-						const result = await executeCode(
-							code,
-							session.language,
-							JSON.stringify(testCase.input),
-						);
-						const passed =
-							result.status === "success" &&
-							result.output?.trim() === JSON.stringify(testCase.output);
-						return {
-							...testCase,
-							result: result.output?.trim() || "",
-							status: passed ? ("pass" as const) : ("fail" as const),
-						};
-					} catch {
-						return { ...testCase, result: "Error", status: "fail" as const };
-					}
-				}),
-			);
-
-			setTestCases(results);
-
-			const passedCount = results.filter((r) => r.status === "pass").length;
-			const newOutput = results.flatMap((result, index) => [
-				{ message: `Running test case ${index + 1}...`, status: "normal" },
-				{
-					message:
-						result.status === "pass"
-							? `✓ Test case ${index + 1} passed`
-							: `✗ Test case ${index + 1} failed`,
-					status: result.status,
-				},
-			]);
-			newOutput.push({
-				message: `${passedCount}/${results.length} test cases passed`,
-				status: passedCount === results.length ? "pass" : "fail",
-			});
-
-			setOutput(newOutput);
-		} catch (err: any) {
-			setOutput([
-				{ message: "Error running code", status: "fail" },
-				{ message: err.message || "Unknown error", status: "fail" },
-			]);
-		}
-	};
-
-	// Handle submit - marks user as ready, waits for all players
-	const handleSubmit = async () => {
-		if (!sessionId || !session || hasClickedSubmit) return;
-
-		setOutput([{ message: "Marking as ready to submit...", status: "normal" }]);
-
-		try {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-
-			if (user) {
-				// Mark this user as ready (don't capture code yet - wait for all)
-				await supabase
-					.from("session_participants")
-					.update({
-						submission_time: new Date().toISOString(),
-						test_results: {
-							ready_to_submit: true,
-							final_submission: false,
-						},
-					})
-					.eq("session_id", sessionId)
-					.eq("user_id", user.id);
-			}
-
-			setHasClickedSubmit(true);
-			setShowWaitingModal(true);
-
-			setOutput([
-				{ message: "✓ You're ready to submit!", status: "pass" },
-				{ message: "Waiting for teammates to submit...", status: "normal" },
-			]);
-
-			// Check if all participants are already ready (we might be the last one)
-			const updatedParticipants =
-				await sessionService.getSessionParticipants(sessionId);
-			const joinedParticipants = updatedParticipants.filter(
-				(p) => p.status === "joined",
-			);
-			const allReadyToSubmit = joinedParticipants.every((p) => {
-				const testResults = p.test_results as any;
-				return testResults?.ready_to_submit;
-			});
-
-			if (allReadyToSubmit && joinedParticipants.length > 0) {
-				console.log(
-					"All participants ready (including self) - processing final submission",
-				);
-				await processFinalSubmission();
-			}
-		} catch (err: any) {
-			console.error("Error marking ready to submit:", err);
-			setOutput([
-				{ message: "Error marking ready to submit", status: "fail" },
-				{ message: err.message || "Unknown error", status: "fail" },
-			]);
-		}
-	};
-
-	// Handle all submitted - navigate back to explore
-	const handleAllSubmitted = () => {
-		navigate("/explore");
-	};
+	// Waiting for submission modal hook
+	const submissionModal = useWaitingForSubmissionModal({
+		isOpen: showWaitingModal,
+		participants,
+		onAllSubmitted: handleAllSubmitted,
+	});
 
 	// Loading state
 	if (loading) {
@@ -709,26 +117,23 @@ export default function CollaborationPage() {
 		return (
 			<WaitingLobby
 				session={session}
-				participants={participants}
+				participants={waitingLobby.participants}
 				currentUserId={currentUserId}
+				timeElapsed={waitingLobby.timeElapsed}
+				isHost={waitingLobby.isHost}
+				canStart={waitingLobby.canStart}
+				joinedCount={waitingLobby.joinedCount}
+				invitedCount={waitingLobby.invitedCount}
+				declinedCount={waitingLobby.declinedCount}
+				allPlayersJoined={waitingLobby.allPlayersJoined}
 				onStartSession={handleStartSession}
 			/>
 		);
 	}
 
 	// File info for the editor
-	const file = {
-		id: sessionId || "main",
-		filename: `solution.${
-			session.language === "javascript"
-				? "js"
-				: session.language === "typescript"
-					? "ts"
-					: "py"
-		}`,
-		language: session.language,
-		content: starterCode,
-	};
+	const file = getFileInfo();
+	if (!file) return null;
 
 	return (
 		<div className="flex flex-col h-screen bg-[#171717] text-gray-200">
@@ -737,7 +142,13 @@ export default function CollaborationPage() {
 				isOpen={showWaitingModal}
 				participants={participants}
 				currentUserId={currentUserId}
-				onAllSubmitted={handleAllSubmitted}
+				elapsedTime={submissionModal.elapsedTime}
+				redirectCountdown={submissionModal.redirectCountdown}
+				readyCount={submissionModal.readyCount}
+				submittedCount={submissionModal.submittedCount}
+				allReady={submissionModal.allReady}
+				allSubmitted={submissionModal.allSubmitted}
+				onLeave={submissionModal.handleLeave}
 			/>
 
 			{/* Navbar */}
@@ -801,9 +212,15 @@ export default function CollaborationPage() {
 					<div className="flex items-center space-x-1 px-2 py-1 bg-gray-700 rounded text-sm">
 						<Clock
 							size={14}
-							className={seconds < 300 ? "text-red-400" : "text-gray-400"}
+							className={
+								seconds < LOW_TIME_THRESHOLD ? "text-red-400" : "text-gray-400"
+							}
 						/>
-						<span className={seconds < 300 ? "text-red-400" : "text-white"}>
+						<span
+							className={
+								seconds < LOW_TIME_THRESHOLD ? "text-red-400" : "text-white"
+							}
+						>
 							{timeStr}
 						</span>
 					</div>
@@ -928,9 +345,14 @@ export default function CollaborationPage() {
 						{isChatOpen && (
 							<div className="w-80 flex flex-col bg-[#1a1a1a] border-l border-gray-700">
 								<ChatPanel
+									messages={chatPanel.messages}
+									inputMessage={chatPanel.inputMessage}
+									currentUserId={chatPanel.currentUserId}
+									messagesEndRef={chatPanel.messagesEndRef}
 									isMicOn={isMicOn}
-									setIsMicOn={setIsMicOn}
-									sessionId={sessionId}
+									onMicToggle={toggleMic}
+									onSendMessage={chatPanel.handleSendMessage}
+									onInputChange={chatPanel.updateInputMessage}
 								/>
 							</div>
 						)}
@@ -968,9 +390,14 @@ export default function CollaborationPage() {
 						{mobileView === "chat" && (
 							<div className="flex-1 overflow-hidden">
 								<ChatPanel
+									messages={chatPanel.messages}
+									inputMessage={chatPanel.inputMessage}
+									currentUserId={chatPanel.currentUserId}
+									messagesEndRef={chatPanel.messagesEndRef}
 									isMicOn={isMicOn}
-									setIsMicOn={setIsMicOn}
-									sessionId={sessionId}
+									onMicToggle={toggleMic}
+									onSendMessage={chatPanel.handleSendMessage}
+									onInputChange={chatPanel.updateInputMessage}
 									isMobile={true}
 								/>
 							</div>
@@ -993,7 +420,7 @@ export default function CollaborationPage() {
 					</div>
 					<div className="flex items-center space-x-4">
 						<button
-							onClick={() => setIsChatOpen(!isChatOpen)}
+							onClick={toggleChat}
 							className={`px-2 py-1 rounded ${
 								isChatOpen
 									? "bg-purple-500/20 text-purple-400"

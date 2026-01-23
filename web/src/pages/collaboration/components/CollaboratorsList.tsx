@@ -12,8 +12,8 @@ export const CollaboratorsList = ({
 	currentUserId,
 	isMobile = false,
 }: CollaboratorsListProps) => {
-	// Get avatar color based on user id
-	const getAvatarColor = (userId: string, index: number) => {
+	// Get avatar color based on index
+	const getAvatarColor = (_userId: string, index: number) => {
 		const colors = [
 			"bg-[#FF6B6B]",
 			"bg-[#FFD93D]",
@@ -42,7 +42,7 @@ export const CollaboratorsList = ({
 							key={participant.id}
 							className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 border-[#2c2c2c] ${getAvatarColor(
 								participant.user_id,
-								index
+								index,
 							)} ${getTextColor(index)}`}
 							title={participant.user?.username || "User"}
 						>
@@ -94,7 +94,7 @@ export const CollaboratorsList = ({
 									<div
 										className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${getAvatarColor(
 											participant.user_id,
-											index
+											index,
 										)} ${getTextColor(index)}`}
 									>
 										{participant.user?.username?.charAt(0).toUpperCase() || "?"}
