@@ -14,6 +14,7 @@ import { SubmissionModal } from "./modals/SubmissionModal";
 
 // Hooks
 import { useMatchPage } from "./hooks/useMatchPage";
+import { useChatPanel } from "./hooks/useChatPanel";
 
 // Constants
 import { getFileExtension } from "./constants";
@@ -73,6 +74,16 @@ export default function MatchPage() {
 		handleSubmit,
 		handleModalClose,
 	} = useMatchPage({ sessionId });
+
+	// Chat panel hook
+	const {
+		messages: chatMessages,
+		inputMessage: chatInputMessage,
+		currentUserId: chatCurrentUserId,
+		messagesEndRef: chatMessagesEndRef,
+		handleSendMessage: handleChatSendMessage,
+		updateInputMessage: updateChatInputMessage,
+	} = useChatPanel({ sessionId });
 
 	// Loading state
 	if (loading) {
@@ -211,9 +222,16 @@ export default function MatchPage() {
 						<div className="w-80 bg-[#1a1a1a] border-l border-gray-700 flex flex-col">
 							<div className="flex-1 min-h-0 max-h-[60%]">
 								<ChatPanel
+									messages={chatMessages}
+									inputMessage={chatInputMessage}
+									currentUserId={chatCurrentUserId}
+									messagesEndRef={
+										chatMessagesEndRef as React.RefObject<HTMLDivElement>
+									}
 									isMicOn={isMicOn}
-									setIsMicOn={setIsMicOn}
-									sessionId={sessionId}
+									onMicToggle={() => setIsMicOn(!isMicOn)}
+									onSendMessage={handleChatSendMessage}
+									onInputChange={updateChatInputMessage}
 								/>
 							</div>
 							<div className="flex-shrink-0 p-4 space-y-4 bg-[#171717] border-t border-gray-700 overflow-y-auto max-h-[40%]">
@@ -258,10 +276,17 @@ export default function MatchPage() {
 						<div className="h-full bg-[#1a1a1a] flex flex-col">
 							<div className="flex-1 min-h-0">
 								<ChatPanel
+									messages={chatMessages}
+									inputMessage={chatInputMessage}
+									currentUserId={chatCurrentUserId}
+									messagesEndRef={
+										chatMessagesEndRef as React.RefObject<HTMLDivElement>
+									}
 									isMicOn={isMicOn}
-									setIsMicOn={setIsMicOn}
+									onMicToggle={() => setIsMicOn(!isMicOn)}
+									onSendMessage={handleChatSendMessage}
+									onInputChange={updateChatInputMessage}
 									isMobile={true}
-									sessionId={sessionId}
 								/>
 							</div>
 							<div className="flex-shrink-0 max-h-[40%] overflow-y-auto">
