@@ -47,7 +47,6 @@ export default function CollaborationPage() {
 		output,
 		testCases,
 		isChatOpen,
-		isMicOn,
 		activeProblemTab,
 		mobileView,
 		isMobile,
@@ -59,7 +58,6 @@ export default function CollaborationPage() {
 		handleSubmit,
 		handleAllSubmitted,
 		toggleChat,
-		toggleMic,
 		setActiveProblemTab,
 		setMobileView,
 		getFileInfo,
@@ -349,8 +347,6 @@ export default function CollaborationPage() {
 									inputMessage={chatPanel.inputMessage}
 									currentUserId={chatPanel.currentUserId}
 									messagesEndRef={chatPanel.messagesEndRef}
-									isMicOn={isMicOn}
-									onMicToggle={toggleMic}
 									onSendMessage={chatPanel.handleSendMessage}
 									onInputChange={chatPanel.updateInputMessage}
 								/>
@@ -394,8 +390,6 @@ export default function CollaborationPage() {
 									inputMessage={chatPanel.inputMessage}
 									currentUserId={chatPanel.currentUserId}
 									messagesEndRef={chatPanel.messagesEndRef}
-									isMicOn={isMicOn}
-									onMicToggle={toggleMic}
 									onSendMessage={chatPanel.handleSendMessage}
 									onInputChange={chatPanel.updateInputMessage}
 									isMobile={true}

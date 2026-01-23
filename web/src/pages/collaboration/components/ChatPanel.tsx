@@ -1,5 +1,5 @@
 import React from "react";
-import { Send, Mic, MicOff } from "lucide-react";
+import { Send } from "lucide-react";
 import type { ChatPanelProps } from "../types";
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -7,8 +7,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 	inputMessage,
 	currentUserId,
 	messagesEndRef,
-	isMicOn,
-	onMicToggle,
 	onSendMessage,
 	onInputChange,
 	isMobile = false,
@@ -16,23 +14,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 	return (
 		<div className="flex flex-col h-full bg-[#1a1a1a]">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
+			<div className="flex items-center px-3 py-2 border-b border-gray-700">
 				<h3
 					className={`font-medium text-gray-200 ${isMobile ? "text-sm" : ""}`}
 				>
 					Team Chat
 				</h3>
-				<button
-					onClick={onMicToggle}
-					className={`p-1.5 rounded-md transition ${
-						isMicOn
-							? "bg-purple-500 text-white"
-							: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-					}`}
-					title={isMicOn ? "Mute microphone" : "Unmute microphone"}
-				>
-					{isMicOn ? <Mic size={16} /> : <MicOff size={16} />}
-				</button>
 			</div>
 
 			{/* Messages */}

@@ -109,8 +109,6 @@ export interface ChatPanelProps {
 	inputMessage: string;
 	currentUserId: string;
 	messagesEndRef: React.RefObject<HTMLDivElement | null>;
-	isMicOn: boolean;
-	onMicToggle: () => void;
 	onSendMessage: (e: React.FormEvent) => void;
 	onInputChange: (value: string) => void;
 	isMobile?: boolean;

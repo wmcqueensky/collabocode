@@ -41,8 +41,6 @@ export default function MatchPage() {
 		setIsMobileMenuOpen,
 		activePanel,
 		setActivePanel,
-		isMicOn,
-		setIsMicOn,
 
 		// Code editor
 		code,
@@ -228,8 +226,6 @@ export default function MatchPage() {
 									messagesEndRef={
 										chatMessagesEndRef as React.RefObject<HTMLDivElement>
 									}
-									isMicOn={isMicOn}
-									onMicToggle={() => setIsMicOn(!isMicOn)}
 									onSendMessage={handleChatSendMessage}
 									onInputChange={updateChatInputMessage}
 								/>
@@ -282,8 +278,6 @@ export default function MatchPage() {
 									messagesEndRef={
 										chatMessagesEndRef as React.RefObject<HTMLDivElement>
 									}
-									isMicOn={isMicOn}
-									onMicToggle={() => setIsMicOn(!isMicOn)}
 									onSendMessage={handleChatSendMessage}
 									onInputChange={updateChatInputMessage}
 									isMobile={true}
