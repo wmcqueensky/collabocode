@@ -414,17 +414,6 @@ const Navbar = () => {
 											>
 												Your Profile
 											</Link>
-											<Link
-												to="/settings"
-												onClick={() => setShowUserMenu(false)}
-												className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center ${
-													isActive("/settings")
-														? "bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca]"
-														: "text-gray-300 hover:bg-gray-700 hover:text-white"
-												}`}
-											>
-												Settings
-											</Link>
 										</div>
 
 										{/* Logout */}
@@ -483,15 +472,6 @@ const Navbar = () => {
 									}`}
 								>
 									Your Profile
-								</Link>
-								<Link
-									to="/settings"
-									onClick={() => setShowMobileMenu(false)}
-									className={`block w-full text-left py-2 ${
-										isActive("/settings") ? "text-[#5bc6ca]" : "text-gray-300"
-									}`}
-								>
-									Settings
 								</Link>
 								<button
 									className="block w-full text-left py-2 text-gray-300"

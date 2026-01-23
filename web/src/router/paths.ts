@@ -5,4 +5,3 @@ export const COLLABORATION_PATH = "/collaboration";
 export const MATCH_SUMMARY_PATH = "/match-summary";
 export const COLLABORATION_SUMMARY_PATH = "/collaboration-summary";
 export const PROFILE_PATH = "/profile";
-export const SETTINGS_PATH = "/settings";
