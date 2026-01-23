@@ -83,7 +83,7 @@ const ConfigureSessionStep = ({
 					<Clock size={16} className={`mr-2 ${ACCENT.text}`} />
 					Time Limit
 				</label>
-				<div className="grid grid-cols-4 gap-2">
+				<div className="grid grid-cols-3 gap-2">
 					{TIME_OPTIONS.map((option) => (
 						<button
 							key={option.value}

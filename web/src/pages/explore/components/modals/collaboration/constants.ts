@@ -22,16 +22,18 @@ export const PROGRAMMING_LANGUAGES: ProgrammingLanguage[] = [
 ];
 
 export const TIME_OPTIONS: TimeOption[] = [
+	{ value: 3, label: "3 min" },
+	{ value: 5, label: "5 min" },
+	{ value: 10, label: "10 min" },
+	{ value: 15, label: "15 min" },
 	{ value: 30, label: "30 min" },
-	{ value: 45, label: "45 min" },
 	{ value: 60, label: "60 min" },
-	{ value: 90, label: "90 min" },
 ];
 
 export const TEAM_SIZES = [2, 3, 4];
 
 export const DEFAULT_LANGUAGE = "javascript";
-export const DEFAULT_TIME_LIMIT = 45;
+export const DEFAULT_TIME_LIMIT = 30;
 export const DEFAULT_PLAYER_COUNT = 2;
 
 export const getLanguageDisplayName = (languageId: string): string => {

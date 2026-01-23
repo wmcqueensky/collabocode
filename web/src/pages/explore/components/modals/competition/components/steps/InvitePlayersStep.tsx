@@ -1,7 +1,6 @@
 // InvitePlayersStep.tsx
 import { useState, useEffect } from "react";
 import { Search, Users, Clock, Code, Check, Loader2 } from "lucide-react";
-import { supabase } from "../../../../../../../lib/supabase";
 import type { Profile } from "../../../../../../../types/database";
 import type { InvitePlayersStepProps } from "../../types";
 import { getLanguageDisplayName } from "../../constants";
@@ -20,7 +19,6 @@ const InvitePlayersStep = ({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searching, setSearching] = useState(false);
 	const [searchResults, setSearchResults] = useState<Profile[]>([]);
-	const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
 	// Calculate how many more players are needed
 	const requiredPlayers = playerCount - 1; // Excluding the current user
@@ -46,37 +44,6 @@ const InvitePlayersStep = ({
 
 		return () => clearTimeout(timer);
 	}, [searchQuery, searchUsers]);
-
-	// Track online presence
-	useEffect(() => {
-		const channel = supabase.channel("online-users");
-
-		channel
-			.on("presence", { event: "sync" }, () => {
-				const state = channel.presenceState();
-				const onlineIds = new Set(
-					Object.values(state)
-						.flat()
-						.map((user: any) => user.user_id),
-				);
-				setOnlineUsers(onlineIds);
-			})
-			.subscribe(async (status) => {
-				if (status === "SUBSCRIBED") {
-					// Track current user's presence
-					const {
-						data: { user },
-					} = await supabase.auth.getUser();
-					if (user) {
-						await channel.track({ user_id: user.id });
-					}
-				}
-			});
-
-		return () => {
-			channel.unsubscribe();
-		};
-	}, []);
 
 	// Use search results if searching, otherwise show all available players
 	const displayPlayers =
@@ -286,13 +253,6 @@ const InvitePlayersStep = ({
 													{player.username?.charAt(0).toUpperCase()}
 												</div>
 											)}
-											<div
-												className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#1f1f1f] ${
-													onlineUsers.has(player.id)
-														? "bg-green-500"
-														: "bg-gray-500"
-												}`}
-											></div>
 										</div>
 
 										<div className="ml-3 flex-1 min-w-0">
