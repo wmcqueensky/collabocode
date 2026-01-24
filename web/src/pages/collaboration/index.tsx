@@ -55,6 +55,7 @@ export default function CollaborationPage() {
 		showWaitingModal,
 		handleStartSession,
 		handleRun,
+		handleRunTest,
 		handleSubmit,
 		handleAllSubmitted,
 		toggleChat,
@@ -186,9 +187,9 @@ export default function CollaborationPage() {
 					<div className="hidden sm:flex items-center space-x-1">
 						<div className="flex -space-x-2">
 							{Array.from(remoteCursors.values())
-								.filter((state) => state.user?.id !== currentUserId)
+								.filter((state: any) => state.user?.id !== currentUserId)
 								.slice(0, 3)
-								.map((state, i) => (
+								.map((state: any, i) => (
 									<div
 										key={state.user?.id || i}
 										className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border-2 border-gray-800"
@@ -306,7 +307,7 @@ export default function CollaborationPage() {
 							activeTab={activeProblemTab}
 							setActiveTab={setActiveProblemTab}
 							testCases={testCases}
-							runTest={handleRun}
+							runTest={handleRunTest}
 							problem={session.problem}
 						/>
 
@@ -364,7 +365,7 @@ export default function CollaborationPage() {
 									activeTab={activeProblemTab}
 									setActiveTab={setActiveProblemTab}
 									testCases={testCases}
-									runTest={handleRun}
+									runTest={handleRunTest}
 									problem={session.problem}
 									isMobile={true}
 								/>
