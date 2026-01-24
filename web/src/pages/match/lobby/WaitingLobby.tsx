@@ -58,14 +58,14 @@ export const WaitingLobby = ({
 							`
 							*,
 							user:profiles(id, username, avatar_url, rating, problems_solved)
-						`
+						`,
 						)
 						.eq("session_id", session.id);
 
 					if (updatedParticipants) {
 						setParticipants(updatedParticipants as SessionParticipant[]);
 					}
-				}
+				},
 			)
 			.subscribe((status) => {
 				console.log("[WaitingLobby] Participant subscription:", status);
@@ -92,7 +92,7 @@ export const WaitingLobby = ({
 						// Force page reload to enter the session
 						window.location.reload();
 					}
-				}
+				},
 			)
 			.subscribe((status) => {
 				console.log("[WaitingLobby] Session subscription:", status);
@@ -123,10 +123,10 @@ export const WaitingLobby = ({
 	// Count participants by status
 	const joinedCount = participants.filter((p) => p.status === "joined").length;
 	const invitedCount = participants.filter(
-		(p) => p.status === "invited"
+		(p) => p.status === "invited",
 	).length;
 	const declinedCount = participants.filter(
-		(p) => p.status === "declined"
+		(p) => p.status === "declined",
 	).length;
 
 	const isHost = session.host_id === currentUserId;
@@ -163,7 +163,6 @@ export const WaitingLobby = ({
 
 	// Determine accent color based on session type
 	const isCollaboration = session.type === "collaboration";
-	const accentColor = isCollaboration ? "purple" : "[#5bc6ca]";
 	const gradientFrom = isCollaboration ? "from-purple-500" : "from-[#5bc6ca]";
 	const gradientTo = isCollaboration ? "to-purple-600" : "to-[#48aeb3]";
 

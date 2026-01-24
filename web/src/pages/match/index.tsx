@@ -19,7 +19,7 @@ import { useChatPanel } from "./hooks/useChatPanel";
 // Constants
 import { getFileExtension } from "./constants";
 
-export default function MatchPage() {
+const MatchPage = () => {
 	const { sessionId } = useParams<{ sessionId: string }>();
 
 	const {
@@ -302,4 +302,6 @@ export default function MatchPage() {
 			/>
 		</div>
 	);
-}
+};
+
+export default MatchPage;
