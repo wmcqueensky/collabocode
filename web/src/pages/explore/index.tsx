@@ -5,7 +5,7 @@ import PageTitle from "./components/layout/PageTitle";
 import CollaborationModal from "./components/modals/collaboration/CollaborationModal";
 import CompetitionModal from "./components/modals/competition/CompetitionModal";
 
-export default function ExplorePage() {
+const ExplorePage = () => {
 	const [isCollaborationModalOpen, setIsCollaborationModalOpen] =
 		useState(false);
 	const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
@@ -21,24 +21,21 @@ export default function ExplorePage() {
 
 				{/* Mode Selection Cards */}
 				<section className="grid md:grid-cols-2 gap-8 mb-24">
-					{/* Duel Mode Card - Teal theme */}
+					{/* Duel Mode Card */}
 					<ExploreCard
 						title="Duel Mode"
 						description="Compete head-to-head against other developers by solving Data Structures and Algorithms problems. Race against the clock and prove your skills in real-time competitive coding battles."
 						headerGradient="bg-gradient-to-r from-[#5bc6ca] to-[#48aeb3]"
 						headerContent={
 							<>
-								{/* Left curly bracket */}
 								<div className="absolute top-1/4 left-6 text-5xl opacity-20 text-black">
 									{"{"}
 								</div>
 
-								{/* Right curly bracket */}
 								<div className="absolute bottom-1/4 right-6 text-5xl opacity-20 text-black">
 									{"}"}
 								</div>
 
-								{/* Centered loop statement */}
 								<div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] md:w-[500px] text-3xl font-mono opacity-30 text-black text-center leading-snug">
 									for (let i = 0; i {"<"} 10; i++)
 								</div>
@@ -58,7 +55,7 @@ export default function ExplorePage() {
 						variant="teal"
 					/>
 
-					{/* Collabo Mode Card - Violet theme (harmonizes with teal) */}
+					{/* Collabo Mode Card */}
 					<ExploreCard
 						title="Collabo Mode"
 						description="Work together with your team in real time to solve a shared DSA problem. Collaborate on solutions, share ideas, and learn from each other as you code."
@@ -106,4 +103,6 @@ export default function ExplorePage() {
 			/>
 		</main>
 	);
-}
+};
+
+export default ExplorePage;
