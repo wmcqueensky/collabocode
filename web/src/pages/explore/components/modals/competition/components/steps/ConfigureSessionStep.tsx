@@ -1,4 +1,4 @@
-import { Clock, Users, Code } from "lucide-react";
+import { Clock, Code, Users, Trophy } from "lucide-react";
 import type { ConfigureSessionStepProps } from "../../types";
 import {
 	PROGRAMMING_LANGUAGES,
@@ -6,6 +6,28 @@ import {
 	AVAILABLE_PLAYER_COUNTS,
 	getDifficultyColor,
 } from "../../constants";
+
+// Accent colors for competition modal (teal)
+const ACCENT = {
+	bg: "bg-[#5bc6ca]",
+	bgLight: "bg-[#5bc6ca]/20",
+	bgLighter: "bg-[#5bc6ca]/10",
+	text: "text-[#5bc6ca]",
+	border: "border-[#5bc6ca]",
+};
+
+const getPlayerCountLabel = (count: number): string => {
+	switch (count) {
+		case 2:
+			return "Duel";
+		case 3:
+			return "Triple";
+		case 4:
+			return "Squad";
+		default:
+			return `${count} players`;
+	}
+};
 
 const ConfigureSessionStep = ({
 	selectedProblem,
@@ -16,152 +38,130 @@ const ConfigureSessionStep = ({
 	playerCount,
 	setPlayerCount,
 }: ConfigureSessionStepProps) => {
-	if (!selectedProblem) {
-		return (
-			<div className="p-6 flex items-center justify-center h-64">
-				<p className="text-gray-400">
-					Please select a problem in the previous step first.
-				</p>
-			</div>
-		);
-	}
-
 	return (
-		<div className="p-6">
-			{/* Selected Problem Info */}
-			<div className="bg-[#2a2a2a] rounded-lg p-4 mb-6 border border-gray-700">
-				<h3 className="font-medium text-lg text-white flex items-center gap-2">
-					<Code size={20} className="text-[#5bc6ca]" />
-					{selectedProblem?.title || "Problem Title Missing"}
-				</h3>
-				<p
-					className={`text-sm font-medium mt-1 ${getDifficultyColor(
-						selectedProblem?.difficulty,
-					)}`}
-				>
-					{selectedProblem?.difficulty || "N/A"}
-				</p>
-				<p className="text-gray-400 text-sm mt-2 line-clamp-2">
-					{selectedProblem?.description || "No description available."}
-				</p>
-			</div>
-
-			{/* Configuration Options */}
-			<div className="grid md:grid-cols-3 gap-6">
-				{/* Time Limit */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Clock size={18} className="text-[#5bc6ca]" />
-						<h4>Time Limit</h4>
+		<div className="p-4 sm:p-6 space-y-5">
+			{/* Selected Problem Summary */}
+			{selectedProblem && (
+				<div className={`bg-[#2a2a2a] rounded-lg p-4 border ${ACCENT.border}`}>
+					<div className="flex items-start space-x-3">
+						<div className={`p-2 ${ACCENT.bgLight} rounded-lg`}>
+							<Trophy className={ACCENT.text} size={20} />
+						</div>
+						<div className="flex-1 min-w-0">
+							<h3 className="font-medium text-white truncate">
+								{selectedProblem.title}
+							</h3>
+							<div className="flex flex-wrap items-center gap-2 mt-1">
+								<span
+									className={`px-2 py-0.5 rounded-full text-xs ${getDifficultyColor(
+										selectedProblem.difficulty,
+									)}`}
+								>
+									{selectedProblem.difficulty}
+								</span>
+								{selectedProblem.tags
+									?.slice(0, 2)
+									.map((tag: string, i: number) => (
+										<span
+											key={i}
+											className="px-2 py-0.5 bg-gray-700 text-gray-300 rounded-full text-xs"
+										>
+											{tag}
+										</span>
+									))}
+							</div>
+						</div>
 					</div>
-					<div className="grid grid-cols-3 gap-2">
-						{AVAILABLE_TIME_LIMITS.map((time) => (
-							<button
-								key={time}
-								className={`py-2 px-1 rounded-md text-center transition ${
-									timeLimit === time
-										? "bg-[#5bc6ca] text-black font-medium"
-										: "bg-[#3a3a3a] text-gray-300 hover:bg-[#4a4a4a]"
-								}`}
-								onClick={() => setTimeLimit(time)}
-							>
-								{time} min
-							</button>
-						))}
-					</div>
-					<p className="text-xs text-gray-400">
-						How much time players will have to solve the problem
-					</p>
 				</div>
+			)}
 
-				{/* Number of Players */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Users size={18} className="text-[#5bc6ca]" />
-						<h4>Number of Players</h4>
-					</div>
-					<div className="grid grid-cols-3 gap-2">
-						{AVAILABLE_PLAYER_COUNTS.map((count) => (
-							<button
-								key={count}
-								className={`py-2 px-1 rounded-md text-center transition ${
-									playerCount === count
-										? "bg-[#5bc6ca] text-black font-medium"
-										: "bg-[#3a3a3a] text-gray-300 hover:bg-[#4a4a4a]"
-								}`}
-								onClick={() => setPlayerCount(count)}
-							>
-								{count} {count === 1 ? "player" : "players"}
-							</button>
-						))}
-					</div>
-					<p className="text-xs text-gray-400">
-						Including you - you'll invite {playerCount - 1} other{" "}
-						{playerCount - 1 === 1 ? "player" : "players"}
-					</p>
-				</div>
-
-				{/* Programming Language */}
-				<div className="space-y-3">
-					<div className="flex items-center gap-2 text-gray-200 font-medium">
-						<Code size={18} className="text-[#5bc6ca]" />
-						<h4>Programming Language</h4>
-					</div>
-					<select
-						value={selectedLanguage}
-						onChange={(e) => setSelectedLanguage(e.target.value)}
-						className="w-full bg-[#3a3a3a] border border-gray-700 rounded-md py-2 px-3 text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5bc6ca]"
-					>
-						{PROGRAMMING_LANGUAGES.map((lang) => (
-							<option key={lang.id} value={lang.id}>
-								{lang.name}
-							</option>
-						))}
-					</select>
-					<p className="text-xs text-gray-400">
-						The programming language all players will use
-					</p>
-				</div>
-			</div>
-
-			{/* Session Settings Preview */}
-			<div className="mt-8 p-4 bg-[#2a2a2a] border border-gray-700 rounded-lg">
-				<h4 className="font-medium text-white mb-2">Session Preview</h4>
-				<div className="grid sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-					<div>
-						<span className="text-gray-400">Problem:</span>
-						<span className="text-white ml-2">
-							{selectedProblem?.title || "N/A"}
-						</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Time Limit:</span>
-						<span className="text-white ml-2">{timeLimit} minutes</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Players:</span>
-						<span className="text-white ml-2">{playerCount}</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Difficulty:</span>
-						<span
-							className={`ml-2 ${getDifficultyColor(
-								selectedProblem?.difficulty,
-							)}`}
+			{/* Language Selection */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Code size={16} className={`mr-2 ${ACCENT.text}`} />
+					Programming Language
+				</label>
+				<div className="grid grid-cols-3 gap-2">
+					{PROGRAMMING_LANGUAGES.slice(0, 6).map((lang) => (
+						<button
+							key={lang.id}
+							onClick={() => setSelectedLanguage(lang.id)}
+							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+								selectedLanguage === lang.id
+									? `${ACCENT.bg} text-black`
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
 						>
-							{selectedProblem?.difficulty || "N/A"}
-						</span>
-					</div>
-					<div>
-						<span className="text-gray-400">Language:</span>
-						<span className="text-white ml-2">
-							{
-								PROGRAMMING_LANGUAGES.find((l) => l.id === selectedLanguage)
-									?.name
-							}
-						</span>
-					</div>
+							{lang.name}
+						</button>
+					))}
 				</div>
+			</div>
+
+			{/* Time Limit */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Clock size={16} className={`mr-2 ${ACCENT.text}`} />
+					Time Limit
+				</label>
+				<div className="grid grid-cols-3 gap-2">
+					{AVAILABLE_TIME_LIMITS.map((time) => (
+						<button
+							key={time}
+							onClick={() => setTimeLimit(time)}
+							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+								timeLimit === time
+									? `${ACCENT.bg} text-black`
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
+						>
+							{time} min
+						</button>
+					))}
+				</div>
+			</div>
+
+			{/* Player Count */}
+			<div>
+				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+					<Users size={16} className={`mr-2 ${ACCENT.text}`} />
+					Number of Players
+				</label>
+				<div className="grid grid-cols-3 gap-2">
+					{AVAILABLE_PLAYER_COUNTS.map((count) => (
+						<button
+							key={count}
+							onClick={() => setPlayerCount(count)}
+							className={`px-3 py-3 rounded-lg text-sm font-medium transition-all ${
+								playerCount === count
+									? `${ACCENT.bg} text-black`
+									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+							}`}
+						>
+							<div className="flex flex-col items-center">
+								<span className="text-lg font-bold">{count}</span>
+								<span className="text-xs opacity-70">
+									{getPlayerCountLabel(count)}
+								</span>
+							</div>
+						</button>
+					))}
+				</div>
+			</div>
+
+			{/* Info Box */}
+			<div
+				className={`${ACCENT.bgLighter} border ${ACCENT.border} rounded-lg p-4`}
+			>
+				<h4 className={`${ACCENT.text} font-medium text-sm mb-2`}>
+					⚔️ Competitive Match
+				</h4>
+				<ul className="text-gray-400 text-xs space-y-1">
+					<li>• Each player writes their own solution independently</li>
+					<li>• Race against others to solve the problem first</li>
+					<li>• Earn rating points based on your performance</li>
+					<li>• Fastest correct solution wins the match</li>
+				</ul>
 			</div>
 		</div>
 	);
