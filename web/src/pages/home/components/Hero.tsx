@@ -53,7 +53,7 @@ const Hero = () => {
 			setText(
 				isDeleting
 					? current.substring(0, Math.max(0, charIndex - 1))
-					: current.substring(0, charIndex + 1)
+					: current.substring(0, charIndex + 1),
 			);
 			setCharIndex(isDeleting ? charIndex - 1 : charIndex + 1);
 
@@ -117,16 +117,9 @@ const Hero = () => {
 				</p>
 
 				<div className="flex flex-wrap justify-center gap-4 py-4 mt-8">
-					{/* Primary CTA - Teal (Challenge focus) */}
 					<a href="/explore">
-						<button className="px-6 py-3 bg-[#5bc6ca] text-black font-semibold rounded-xl hover:bg-[#48aeb3] transition shadow-lg shadow-[#5bc6ca]/20">
-							Start Challenge →
-						</button>
-					</a>
-					{/* Secondary CTA - Violet (Collaboration focus) */}
-					<a href="/explore">
-						<button className="px-6 py-3 bg-[#8b5cf6] text-white font-semibold rounded-xl hover:bg-[#7c3aed] transition shadow-lg shadow-[#8b5cf6]/20">
-							Collaborate Now →
+						<button className="px-6 py-3 bg-gradient-to-r from-[#5bc6ca] to-[#8b5cf6] text-white font-semibold rounded-xl opacity-80 hover:opacity-100 transition shadow-lg shadow-[#5bc6ca]/20">
+							Get Started →
 						</button>
 					</a>
 					<button
