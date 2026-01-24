@@ -36,7 +36,6 @@ const ExploreCard = ({
 }: ExploreCardProps) => {
 	const [isHovered, setIsHovered] = useState(false);
 
-	// Color schemes that harmonize together
 	const colors = {
 		teal: {
 			border: "border-[#5bc6ca]",
