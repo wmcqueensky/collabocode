@@ -25,7 +25,7 @@ const ModalFooter = ({
 
 	return (
 		<div className="p-3 sm:p-4 border-t border-gray-700 bg-[#252525] flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
-			{/* Progress Indicators - Full width on mobile, normal on desktop */}
+			{/* Progress Indicators */}
 			<div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
 				{Array.from({ length: totalSteps }, (_, i) => (
 					<div
@@ -40,9 +40,9 @@ const ModalFooter = ({
 				</span>
 			</div>
 
-			{/* Action Buttons - Full width on mobile, normal on desktop */}
+			{/* Action Buttons */}
 			<div className="flex gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
-				{/* Cancel Button - Icon only on smallest screens */}
+				{/* Cancel Button */}
 				<button
 					type="button"
 					onClick={onClose}

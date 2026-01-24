@@ -138,7 +138,7 @@ export const sessionService = {
 	async addParticipant(
 		sessionId: string,
 		userId: string,
-		role: "participant" | "viewer" = "participant"
+		role: "participant" | "viewer" = "participant",
 	): Promise<void> {
 		// Check if participant already exists
 		const { data: existing } = await supabase
@@ -180,7 +180,7 @@ export const sessionService = {
 			.in("user_id", filteredUserIds);
 
 		const existingUserIds = new Set(
-			existingParticipants?.map((p) => p.user_id) || []
+			existingParticipants?.map((p) => p.user_id) || [],
 		);
 
 		const newParticipants = filteredUserIds
@@ -203,7 +203,7 @@ export const sessionService = {
 
 	// Get session participants
 	async getSessionParticipants(
-		sessionId: string
+		sessionId: string,
 	): Promise<SessionParticipant[]> {
 		const { data, error } = await supabase
 			.from("session_participants")
@@ -218,7 +218,12 @@ export const sessionService = {
 	// Update session status
 	async updateSessionStatus(
 		sessionId: string,
-		status: "waiting" | "in_progress" | "completing" | "completed" | "cancelled"
+		status:
+			| "waiting"
+			| "in_progress"
+			| "completing"
+			| "completed"
+			| "cancelled",
 	): Promise<void> {
 		const updates: any = { status };
 
@@ -240,7 +245,7 @@ export const sessionService = {
 	async updateParticipantStatus(
 		sessionId: string,
 		userId: string,
-		status: "joined" | "declined" | "left"
+		status: "joined" | "declined" | "left",
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -255,7 +260,7 @@ export const sessionService = {
 	async updateParticipantRole(
 		sessionId: string,
 		userId: string,
-		role: "host" | "participant" | "viewer"
+		role: "host" | "participant" | "viewer",
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -269,7 +274,7 @@ export const sessionService = {
 	// Update participant's last active timestamp (for collaboration)
 	async updateParticipantActivity(
 		sessionId: string,
-		userId: string
+		userId: string,
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -284,7 +289,7 @@ export const sessionService = {
 	async updateCursorPosition(
 		sessionId: string,
 		userId: string,
-		cursorPosition: { line: number; column: number }
+		cursorPosition: { line: number; column: number },
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -298,13 +303,12 @@ export const sessionService = {
 		if (error) throw error;
 	},
 
-	// NEW: Update test progress WITHOUT setting submission_time
 	// Use this when running tests (not submitting)
 	async updateTestProgress(
 		sessionId: string,
 		userId: string,
 		code: string,
-		testResults: any
+		testResults: any,
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -326,7 +330,7 @@ export const sessionService = {
 		sessionId: string,
 		userId: string,
 		code: string,
-		testResults: any
+		testResults: any,
 	): Promise<void> {
 		const { error } = await supabase
 			.from("session_participants")
@@ -354,7 +358,7 @@ export const sessionService = {
 					table: "session_participants",
 					filter: `session_id=eq.${sessionId}`,
 				},
-				callback
+				callback,
 			)
 			.on(
 				"postgres_changes",
@@ -364,7 +368,7 @@ export const sessionService = {
 					table: "sessions",
 					filter: `id=eq.${sessionId}`,
 				},
-				callback
+				callback,
 			)
 			.subscribe();
 	},
@@ -377,7 +381,7 @@ export const sessionService = {
 	// Get all sessions for a user
 	async getUserSessions(
 		userId?: string,
-		type?: SessionType
+		type?: SessionType,
 	): Promise<Session[]> {
 		const {
 			data: { user },
@@ -420,7 +424,7 @@ export const sessionService = {
 		// Remove duplicates
 		const uniqueSessions = allSessions.filter(
 			(session, index, self) =>
-				index === self.findIndex((s) => s.id === session.id)
+				index === self.findIndex((s) => s.id === session.id),
 		);
 
 		return uniqueSessions;

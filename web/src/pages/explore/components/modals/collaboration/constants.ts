@@ -1,6 +1,5 @@
 import type { ProgrammingLanguage, TimeOption } from "./types";
 
-// Violet accent colors for collaboration theme
 export const ACCENT = {
 	bg: "bg-[#8b5cf6]",
 	bgLight: "bg-[#8b5cf6]/20",

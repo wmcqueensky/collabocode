@@ -8,12 +8,16 @@ interface UseSessionReturn {
 	participants: SessionParticipant[];
 	loading: boolean;
 	error: string | null;
-	// NEW: Separate function for updating test progress (no submission)
 	updateTestProgress: (code: string, testResults: any) => Promise<void>;
 	// Submit code (final submission with submission_time)
 	submitCode: (code: string, testResults: any) => Promise<void>;
 	updateStatus: (
-		status: "waiting" | "in_progress" | "completing" | "completed" | "cancelled"
+		status:
+			| "waiting"
+			| "in_progress"
+			| "completing"
+			| "completed"
+			| "cancelled",
 	) => Promise<void>;
 	refetch: () => Promise<void>;
 }
@@ -58,9 +62,8 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 			setSession(sessionData);
 
 			// Get participants
-			const participantsData = await sessionService.getSessionParticipants(
-				sessionId
-			);
+			const participantsData =
+				await sessionService.getSessionParticipants(sessionId);
 			setParticipants(participantsData);
 		} catch (err: any) {
 			console.error("Error fetching session:", err);
@@ -91,11 +94,10 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 				},
 				async () => {
 					// Refetch participants on any change
-					const participantsData = await sessionService.getSessionParticipants(
-						sessionId
-					);
+					const participantsData =
+						await sessionService.getSessionParticipants(sessionId);
 					setParticipants(participantsData);
-				}
+				},
 			)
 			.on(
 				"postgres_changes",
@@ -111,7 +113,7 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 					if (sessionData) {
 						setSession(sessionData);
 					}
-				}
+				},
 			)
 			.subscribe();
 
@@ -120,7 +122,6 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 		};
 	}, [sessionId]);
 
-	// NEW: Update test progress WITHOUT triggering submission
 	// Use this when running tests from the Test Cases panel or Run button
 	const updateTestProgress = useCallback(
 		async (code: string, testResults: any) => {
@@ -132,10 +133,10 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 				sessionId,
 				currentUserId,
 				code,
-				testResults
+				testResults,
 			);
 		},
-		[sessionId, currentUserId]
+		[sessionId, currentUserId],
 	);
 
 	// Submit code (final submission)
@@ -150,10 +151,10 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 				sessionId,
 				currentUserId,
 				code,
-				testResults
+				testResults,
 			);
 		},
-		[sessionId, currentUserId]
+		[sessionId, currentUserId],
 	);
 
 	// Update session status
@@ -164,7 +165,7 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 				| "in_progress"
 				| "completing"
 				| "completed"
-				| "cancelled"
+				| "cancelled",
 		) => {
 			if (!sessionId) {
 				throw new Error("Session not available");
@@ -172,7 +173,7 @@ export function useSession(sessionId: string | null): UseSessionReturn {
 
 			await sessionService.updateSessionStatus(sessionId, status);
 		},
-		[sessionId]
+		[sessionId],
 	);
 
 	return {
