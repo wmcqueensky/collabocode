@@ -3,6 +3,18 @@ import { Awareness } from "y-protocols/awareness";
 import type { editor as MonacoEditor, IDisposable } from "monaco-editor";
 import type { UserAwareness } from "./collaborationDocument";
 
+// Extend UserAwareness type to include cursor properties
+declare module "./collaborationDocument" {
+	interface UserAwareness {
+		cursor?: {
+			anchor: number;
+			head: number;
+			lineNumber: number;
+			column: number;
+		};
+	}
+}
+
 // Cursor decoration styles
 const createCursorStyles = () => {
 	const styleSheet = document.createElement("style");
