@@ -63,7 +63,6 @@ const Features = () => {
 					{features.map((feature, index) => {
 						const Icon = feature.icon;
 						const isTeal = feature.color === "teal";
-						const accentColor = isTeal ? "#5bc6ca" : "#a78bfa";
 						const bgColor = isTeal ? "bg-[#5bc6ca]/10" : "bg-[#8b5cf6]/10";
 						const textColor = isTeal ? "text-[#5bc6ca]" : "text-[#a78bfa]";
 
