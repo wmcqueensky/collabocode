@@ -32,7 +32,6 @@ export class SupabaseYjsProvider {
 	private onSyncCallbacks: (() => void)[] = [];
 	private onAwarenessCallbacks: ((states: Map<number, any>) => void)[] = [];
 	private isDestroyed: boolean = false;
-	private pendingUpdates: Uint8Array[] = [];
 	private syncTimeout: NodeJS.Timeout | null = null;
 
 	constructor(roomName: string, doc: Y.Doc, userId: string) {
@@ -172,7 +171,7 @@ export class SupabaseYjsProvider {
 		syncProtocol.writeSyncStep1(syncMessage, this.doc);
 		encoding.writeVarUint8Array(
 			syncEncoder,
-			encoding.toUint8Array(syncMessage)
+			encoding.toUint8Array(syncMessage),
 		);
 		this.broadcast(encoding.toUint8Array(syncEncoder));
 	}
@@ -182,7 +181,6 @@ export class SupabaseYjsProvider {
 		const encoder = encoding.createEncoder();
 		encoding.writeVarUint(encoder, MESSAGE_SYNC);
 
-		const stateVector = Y.encodeStateVector(this.doc);
 		const update = Y.encodeStateAsUpdate(this.doc);
 
 		// Send as sync step 2
@@ -193,7 +191,7 @@ export class SupabaseYjsProvider {
 		this.broadcastAwareness();
 	}
 
-	private handleSyncMessage(decoder: decoding.Decoder, senderId: string) {
+	private handleSyncMessage(decoder: decoding.Decoder, _senderId: string) {
 		const encoder = encoding.createEncoder();
 
 		// Apply the sync message - mark origin as 'remote' so we don't re-broadcast
@@ -201,7 +199,7 @@ export class SupabaseYjsProvider {
 			decoder,
 			encoder,
 			this.doc,
-			"remote" // Use 'remote' as origin to prevent re-broadcasting
+			"remote", // Use 'remote' as origin to prevent re-broadcasting
 		);
 
 		// If we need to respond (sync step 2), send it back
@@ -210,7 +208,7 @@ export class SupabaseYjsProvider {
 			encoding.writeVarUint(responseEncoder, MESSAGE_SYNC);
 			encoding.writeVarUint8Array(
 				responseEncoder,
-				encoding.toUint8Array(encoder)
+				encoding.toUint8Array(encoder),
 			);
 			this.broadcast(encoding.toUint8Array(responseEncoder));
 		}
@@ -254,7 +252,7 @@ export class SupabaseYjsProvider {
 		// Only encode our own awareness state
 		const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(
 			this.awareness,
-			[this.doc.clientID]
+			[this.doc.clientID],
 		);
 
 		encoding.writeVarUint8Array(encoder, awarenessUpdate);

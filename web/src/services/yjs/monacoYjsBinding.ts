@@ -3,18 +3,6 @@ import { Awareness } from "y-protocols/awareness";
 import type { editor as MonacoEditor, IDisposable } from "monaco-editor";
 import type { UserAwareness } from "./collaborationDocument";
 
-// Extend UserAwareness type to include cursor properties
-declare module "./collaborationDocument" {
-	interface UserAwareness {
-		cursor?: {
-			anchor: number;
-			head: number;
-			lineNumber: number;
-			column: number;
-		};
-	}
-}
-
 // Cursor decoration styles
 const createCursorStyles = () => {
 	const styleSheet = document.createElement("style");
@@ -68,13 +56,12 @@ export class MonacoYjsBinding {
 	private isApplyingRemoteChange: boolean = false;
 	private isLocalChange: boolean = false;
 	private userId: string;
-	private savedSelection: { anchor: number; head: number } | null = null;
 
 	constructor(
 		editor: MonacoEditor.IStandaloneCodeEditor,
 		ytext: Y.Text,
 		awareness: Awareness,
-		userId: string
+		userId: string,
 	) {
 		this.editor = editor;
 		this.ytext = ytext;
@@ -106,7 +93,7 @@ export class MonacoYjsBinding {
 				this.ytext.doc?.transact(() => {
 					// Apply changes in reverse order to maintain correct offsets
 					const sortedChanges = [...event.changes].sort(
-						(a, b) => b.rangeOffset - a.rangeOffset
+						(a, b) => b.rangeOffset - a.rangeOffset,
 					);
 
 					sortedChanges.forEach((change) => {
@@ -120,7 +107,7 @@ export class MonacoYjsBinding {
 				}, "local"); // Mark as local origin
 
 				this.isLocalChange = false;
-			}
+			},
 		);
 		this.disposables.push(contentChangeDisposable);
 
@@ -256,7 +243,7 @@ export class MonacoYjsBinding {
 						},
 					});
 				}
-			}
+			},
 		);
 		this.disposables.push(cursorChangeDisposable);
 
@@ -285,7 +272,7 @@ export class MonacoYjsBinding {
 		const states = this.awareness.getStates();
 		const newDecorations: MonacoEditor.IModelDeltaDecoration[] = [];
 
-		states.forEach((state, clientId) => {
+		states.forEach((state, _clientId) => {
 			const userState = state as UserAwareness;
 
 			// Skip local user - we don't need to show our own remote cursor
@@ -297,11 +284,14 @@ export class MonacoYjsBinding {
 			try {
 				// Validate cursor positions
 				const maxOffset = model.getValue().length;
-				const anchorOffset = Math.min(Math.max(0, cursor.anchor), maxOffset);
-				const headOffset = Math.min(Math.max(0, cursor.head), maxOffset);
+				const anchorOffset = Math.min(
+					Math.max(0, cursor.anchor ?? 0),
+					maxOffset,
+				);
+				const headOffset = Math.min(Math.max(0, cursor.head ?? 0), maxOffset);
 
 				const startPos = model.getPositionAt(
-					Math.min(anchorOffset, headOffset)
+					Math.min(anchorOffset, headOffset),
 				);
 				const endPos = model.getPositionAt(Math.max(anchorOffset, headOffset));
 
@@ -345,7 +335,7 @@ export class MonacoYjsBinding {
 		// Apply decorations
 		this.cursorDecorations = this.editor.deltaDecorations(
 			this.cursorDecorations,
-			newDecorations
+			newDecorations,
 		);
 
 		// Update cursor colors via DOM manipulation (Monaco doesn't support dynamic colors in decorations)
@@ -374,7 +364,7 @@ export class MonacoYjsBinding {
 
 					// Add or update label
 					let label = cursorEl.querySelector(
-						".yjs-cursor-label"
+						".yjs-cursor-label",
 					) as HTMLElement;
 					if (!label) {
 						label = document.createElement("div");
@@ -432,7 +422,7 @@ export class MonacoYjsBinding {
 		// Clear decorations
 		this.cursorDecorations = this.editor.deltaDecorations(
 			this.cursorDecorations,
-			[]
+			[],
 		);
 	}
 }

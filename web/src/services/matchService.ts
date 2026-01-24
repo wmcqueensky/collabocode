@@ -34,7 +34,7 @@ export const matchService = {
 				user_id: p.user_id,
 				is_correct: p.is_correct,
 				submission_time: p.submission_time,
-			}))
+			})),
 		);
 
 		// Sort by: is_correct (true first), then by submission_time
@@ -63,7 +63,7 @@ export const matchService = {
 				id: p.id,
 				user_id: p.user_id,
 				is_correct: p.is_correct,
-			}))
+			})),
 		);
 
 		// Update rankings
@@ -72,7 +72,7 @@ export const matchService = {
 			const newRanking = i + 1;
 
 			console.log(
-				`📊 Setting ranking ${newRanking} for ${participant.user_id}`
+				`📊 Setting ranking ${newRanking} for ${participant.user_id}`,
 			);
 
 			const { data, error } = await supabase
@@ -99,7 +99,7 @@ export const matchService = {
 
 				if (fallbackError || !fallbackData?.length) {
 					throw new Error(
-						`Failed to update ranking for ${participant.user_id}`
+						`Failed to update ranking for ${participant.user_id}`,
 					);
 				}
 			}
@@ -155,7 +155,6 @@ export const matchService = {
 		console.log("🏆 Winner:", winner?.user_id);
 
 		// Determine which table to use
-		const historyTable = "session_history";
 		let useSessionHistory = true;
 
 		// Check if session_history table exists
@@ -173,7 +172,7 @@ export const matchService = {
 			const result = isWinner ? "win" : "loss";
 			const ratingChange = this.calculateEloRatingChange(
 				participant.ranking || 999,
-				participants.length
+				participants.length,
 			);
 
 			console.log(`📝 Recording for ${participant.user_id}:`, {
@@ -229,7 +228,7 @@ export const matchService = {
 				if (sessionType === "match") {
 					updates.match_rating = Math.max(
 						0,
-						(profile.match_rating || profile.rating || 1500) + ratingChange
+						(profile.match_rating || profile.rating || 1500) + ratingChange,
 					);
 					updates.rating = updates.match_rating; // Backward compatibility
 
@@ -241,7 +240,7 @@ export const matchService = {
 				} else {
 					updates.collaboration_rating = Math.max(
 						0,
-						(profile.collaboration_rating || 1500) + ratingChange
+						(profile.collaboration_rating || 1500) + ratingChange,
 					);
 
 					if (participant.is_correct) {
@@ -312,7 +311,7 @@ export const matchService = {
 
 				const complexityAnalysis = codeAnalyzerService.analyzeComplexity(
 					p.code_snapshot,
-					session.language
+					session.language,
 				);
 
 				const testResults = p.test_results || {};
@@ -324,7 +323,7 @@ export const matchService = {
 					? new Date(p.submission_time).toLocaleTimeString("en-US", {
 							hour: "2-digit",
 							minute: "2-digit",
-					  })
+						})
 					: "N/A";
 
 				const timeInSeconds =
@@ -332,8 +331,8 @@ export const matchService = {
 						? Math.floor(
 								(new Date(p.submission_time).getTime() -
 									new Date(session.started_at).getTime()) /
-									1000
-						  )
+									1000,
+							)
 						: 0;
 
 				const minutes = Math.floor(timeInSeconds / 60);
@@ -345,8 +344,8 @@ export const matchService = {
 				// Get current rating based on session type
 				const currentRating =
 					sessionType === "match"
-						? profile?.match_rating ?? profile?.rating ?? 1500
-						: profile?.collaboration_rating ?? 1500;
+						? (profile?.match_rating ?? profile?.rating ?? 1500)
+						: (profile?.collaboration_rating ?? 1500);
 
 				// Try to get rating change from session_history first, then match_history
 				let actualRatingChange = 0;
@@ -395,8 +394,8 @@ export const matchService = {
 						actualRanking === 1
 							? "#FFD93D"
 							: actualRanking === 2
-							? "#C0C0C0"
-							: "#CD7F32",
+								? "#C0C0C0"
+								: "#CD7F32",
 					textColor: "text-gray-900",
 					isCorrect: p.is_correct === true,
 					userId: p.user_id,
@@ -405,7 +404,7 @@ export const matchService = {
 					ratingChange: actualRatingChange,
 					role: p.role,
 				};
-			})
+			}),
 		);
 
 		const sortedPlayers = participantsWithData.sort((a, b) => a.rank - b.rank);

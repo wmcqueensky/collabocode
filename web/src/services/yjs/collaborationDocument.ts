@@ -11,9 +11,11 @@ export interface UserAwareness {
 		color: string;
 		colorLight: string;
 	};
-	cursor: {
+	cursor?: {
 		lineNumber: number;
 		column: number;
+		anchor?: number;
+		head?: number;
 	} | null;
 }
 
@@ -87,7 +89,7 @@ export function getUserColor(userId: string): { color: string; light: string } {
  * Format awareness states into a map for easier consumption
  */
 export function formatAwarenessStates(
-	awareness: Awareness
+	awareness: Awareness,
 ): Map<number, UserAwareness> {
 	const states = new Map<number, UserAwareness>();
 	awareness.getStates().forEach((state, clientId) => {
