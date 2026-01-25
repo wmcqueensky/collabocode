@@ -65,7 +65,7 @@ export const userService = {
 	// Get user session history (supports both match and collaboration)
 	async getSessionHistory(
 		userId?: string,
-		type?: SessionType
+		type?: SessionType,
 	): Promise<SessionHistory[]> {
 		const {
 			data: { user },
@@ -137,7 +137,7 @@ export const userService = {
 	async updateRating(
 		userId: string,
 		type: SessionType,
-		ratingChange: number
+		ratingChange: number,
 	): Promise<void> {
 		const profile = await this.getProfileById(userId);
 		if (!profile) throw new Error("Profile not found");
@@ -151,7 +151,7 @@ export const userService = {
 		} else {
 			updates.collaboration_rating = Math.max(
 				0,
-				profile.collaboration_rating + ratingChange
+				profile.collaboration_rating + ratingChange,
 			);
 		}
 
@@ -230,7 +230,7 @@ export const userService = {
 
 	// Update daily streak - called when user logs in for the day
 	async updateDailyStreak(
-		userId: string
+		userId: string,
 	): Promise<{ streak: number; isNewDay: boolean } | null> {
 		try {
 			const { data: profile, error: fetchError } = await supabase
@@ -244,20 +244,13 @@ export const userService = {
 				return null;
 			}
 
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-			const todayStr = today.toISOString().split("T")[0];
+			// Get today's date in local timezone as YYYY-MM-DD string
+			// Using local date methods to avoid timezone conversion issues
+			const now = new Date();
+			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-			const lastLoginDate = profile?.last_login_date
-				? new Date(profile.last_login_date)
-				: null;
-			if (lastLoginDate) {
-				lastLoginDate.setHours(0, 0, 0, 0);
-			}
-
-			const lastLoginStr = lastLoginDate
-				? lastLoginDate.toISOString().split("T")[0]
-				: null;
+			// Get last login date string directly from database (already in YYYY-MM-DD format)
+			const lastLoginStr = profile?.last_login_date || null;
 
 			// If already logged in today, return current streak
 			if (lastLoginStr === todayStr) {
@@ -266,10 +259,11 @@ export const userService = {
 
 			let newStreak = 1;
 
-			if (lastLoginDate) {
-				const yesterday = new Date(today);
+			if (lastLoginStr) {
+				// Calculate yesterday's date in local timezone
+				const yesterday = new Date(now);
 				yesterday.setDate(yesterday.getDate() - 1);
-				const yesterdayStr = yesterday.toISOString().split("T")[0];
+				const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
 
 				// If last login was yesterday, increment streak
 				if (lastLoginStr === yesterdayStr) {
@@ -326,7 +320,7 @@ export const userService = {
 		const { data: profile, error } = await supabase
 			.from("profiles")
 			.select(
-				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved, streak, last_login_date"
+				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved, streak, last_login_date",
 			)
 			.eq("id", targetUserId)
 			.single();
@@ -374,7 +368,7 @@ export const userService = {
 
 	// Legacy helper function to calculate streak from history (deprecated)
 	calculateStreak(
-		matches: Array<{ created_at: string; completed: boolean }>
+		matches: Array<{ created_at: string; completed: boolean }>,
 	): number {
 		if (!matches || matches.length === 0) return 0;
 
