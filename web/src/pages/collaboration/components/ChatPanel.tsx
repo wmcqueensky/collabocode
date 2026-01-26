@@ -12,11 +12,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 	isMobile = false,
 }) => {
 	return (
-		<div className="flex flex-col h-full bg-[#1a1a1a]">
+		<div className="flex flex-col h-full bg-gray-50">
 			{/* Header */}
-			<div className="flex items-center px-3 py-2 border-b border-gray-700">
+			<div className="flex items-center px-3 py-2 border-b border-gray-200">
 				<h3
-					className={`font-medium text-gray-200 ${isMobile ? "text-sm" : ""}`}
+					className={`font-medium text-gray-900 ${isMobile ? "text-sm" : ""}`}
 				>
 					Team Chat
 				</h3>
@@ -25,7 +25,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 			{/* Messages */}
 			<div className="flex-1 overflow-y-auto p-3 space-y-2">
 				{messages.length === 0 ? (
-					<div className="flex items-center justify-center h-full text-gray-500 text-sm">
+					<div className="flex items-center justify-center h-full text-gray-400 text-sm">
 						No messages yet. Say hi! 👋
 					</div>
 				) : (
@@ -47,11 +47,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 									className={`max-w-[75%] rounded-lg px-3 py-2 ${
 										isCurrentUser
 											? "bg-purple-500 text-white"
-											: "bg-gray-700 text-gray-200"
+											: "bg-white text-gray-700 border border-gray-200"
 									}`}
 								>
 									{!isCurrentUser && (
-										<div className="text-xs font-medium mb-1 opacity-75">
+										<div className="text-xs font-medium mb-1 text-gray-500">
 											{msg.username}
 										</div>
 									)}
@@ -74,14 +74,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 			</div>
 
 			{/* Input */}
-			<form onSubmit={onSendMessage} className="p-3 border-t border-gray-700">
+			<form onSubmit={onSendMessage} className="p-3 border-t border-gray-200">
 				<div className="flex space-x-2">
 					<input
 						type="text"
 						value={inputMessage}
 						onChange={(e) => onInputChange(e.target.value)}
 						placeholder="Type a message..."
-						className={`flex-1 bg-gray-700 text-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-purple-500 ${
+						className={`flex-1 bg-white text-gray-700 rounded-md px-3 py-2 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500 ${
 							isMobile ? "text-sm" : ""
 						}`}
 					/>

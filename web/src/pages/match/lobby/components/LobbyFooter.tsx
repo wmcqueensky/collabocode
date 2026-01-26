@@ -26,11 +26,11 @@ export const LobbyFooter = ({
 	onStartSession,
 }: LobbyFooterProps) => {
 	return (
-		<div className="p-6 bg-[#2a2a2a] border-t border-gray-700">
+		<div className="p-6 bg-gray-50 border-t border-gray-200">
 			<div className="flex flex-col sm:flex-row items-center justify-between gap-4">
 				<div className="text-center sm:text-left">
-					<p className="text-gray-400 text-sm">Time elapsed</p>
-					<p className="text-white font-mono text-lg">
+					<p className="text-gray-500 text-sm">Time elapsed</p>
+					<p className="text-gray-900 font-mono text-lg">
 						{formatTime(timeElapsed)}
 					</p>
 				</div>
@@ -38,14 +38,14 @@ export const LobbyFooter = ({
 				{/* Status Messages */}
 				<div className="text-center flex-1">
 					{allPlayersJoined ? (
-						<div className="flex items-center justify-center text-green-500">
+						<div className="flex items-center justify-center text-green-600">
 							<CheckCircle size={20} className="mr-2" />
 							<span className="font-medium">
 								All {isCollaboration ? "collaborators" : "players"} ready!
 							</span>
 						</div>
 					) : invitedCount > 0 ? (
-						<div className="flex items-center justify-center text-yellow-500">
+						<div className="flex items-center justify-center text-yellow-600">
 							<Loader2 size={20} className="mr-2 animate-spin" />
 							<span>
 								Waiting for {invitedCount}{" "}
@@ -53,7 +53,7 @@ export const LobbyFooter = ({
 							</span>
 						</div>
 					) : (
-						<div className="text-gray-400">
+						<div className="text-gray-500">
 							<span>
 								Waiting for more {isCollaboration ? "collaborators" : "players"}{" "}
 								to join...
@@ -72,15 +72,15 @@ export const LobbyFooter = ({
 								canStart
 									? isCollaboration
 										? "bg-purple-500 hover:bg-purple-600 text-white"
-										: "bg-[#5bc6ca] hover:bg-[#48aeb3] text-white"
-									: "bg-gray-700 text-gray-500 cursor-not-allowed"
+										: "bg-sky-500 hover:bg-sky-600 text-white"
+									: "bg-gray-200 text-gray-400 cursor-not-allowed"
 							}`}
 						>
 							{allPlayersJoined ? "Start Session" : "Start Anyway"}
 						</button>
 					)}
 					{!isHost && (
-						<div className="text-gray-400 text-sm italic">
+						<div className="text-gray-500 text-sm italic">
 							Waiting for host to start...
 						</div>
 					)}
@@ -92,13 +92,13 @@ export const LobbyFooter = ({
 				<div
 					className={`mt-4 p-3 rounded-lg ${
 						isCollaboration
-							? "bg-purple-500/10 border border-purple-500/30"
-							: "bg-yellow-500/10 border border-yellow-500/30"
+							? "bg-purple-50 border border-purple-200"
+							: "bg-yellow-50 border border-yellow-200"
 					}`}
 				>
 					<p
 						className={`text-sm text-center ${
-							isCollaboration ? "text-purple-400" : "text-yellow-500"
+							isCollaboration ? "text-purple-700" : "text-yellow-700"
 						}`}
 					>
 						💡 You can start the session now with {joinedCount}{" "}
@@ -109,8 +109,8 @@ export const LobbyFooter = ({
 			)}
 
 			{declinedCount > 0 && (
-				<div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-					<p className="text-red-400 text-sm text-center">
+				<div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+					<p className="text-red-700 text-sm text-center">
 						{declinedCount} {declinedCount === 1 ? "person" : "people"} declined
 						the invitation
 					</p>
@@ -122,8 +122,8 @@ export const LobbyFooter = ({
 				<span
 					className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
 						isCollaboration
-							? "bg-purple-500/20 text-purple-400"
-							: "bg-[#5bc6ca]/20 text-[#5bc6ca]"
+							? "bg-purple-100 text-purple-700"
+							: "bg-sky-100 text-sky-700"
 					}`}
 				>
 					{isCollaboration ? "🤝 Collaboration Mode" : "⚔️ Match Mode"} • Closed

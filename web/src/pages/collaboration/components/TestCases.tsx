@@ -3,7 +3,7 @@ import { PlayCircle, Check, X, Clock } from "lucide-react";
 export const TestCases = ({ testCases, runTest, isMobile = false }: any) => {
 	return (
 		<div
-			className={`space-y-3 sm:space-y-4 text-gray-300 ${
+			className={`space-y-3 sm:space-y-4 text-gray-700 ${
 				isMobile ? "text-sm" : ""
 			}`}
 		>
@@ -11,12 +11,12 @@ export const TestCases = ({ testCases, runTest, isMobile = false }: any) => {
 				<h2
 					className={`${
 						isMobile ? "text-base" : "text-lg"
-					} font-medium text-gray-200`}
+					} font-medium text-gray-900`}
 				>
 					Test Cases
 				</h2>
 				<button
-					className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-3 py-1 rounded text-xs sm:text-sm flex items-center justify-center space-x-1 w-full sm:w-auto transition"
+					className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1 rounded text-xs sm:text-sm flex items-center justify-center space-x-1 w-full sm:w-auto transition"
 					onClick={() => runTest("all")}
 				>
 					<PlayCircle size={isMobile ? 12 : 14} />
@@ -29,23 +29,23 @@ export const TestCases = ({ testCases, runTest, isMobile = false }: any) => {
 						key={index}
 						className={`border rounded-md overflow-hidden ${
 							test.status === "pass"
-								? "border-purple-500 border-opacity-30"
+								? "border-purple-300"
 								: test.status === "fail"
-									? "border-red-800"
-									: "border-gray-700"
+									? "border-red-300"
+									: "border-gray-200"
 						}`}
 					>
-						<div className="flex items-center justify-between px-2 sm:px-3 py-2 bg-[#171717] border-b border-gray-700">
+						<div className="flex items-center justify-between px-2 sm:px-3 py-2 bg-gray-50 border-b border-gray-200">
 							<div
 								className={`font-medium ${
 									isMobile ? "text-xs" : "text-sm"
-								} text-gray-300 flex-1`}
+								} text-gray-700 flex-1`}
 							>
 								Test Case {index + 1}
 							</div>
 							<div className="flex items-center space-x-2">
 								<button
-									className="text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-2 py-0.5 rounded whitespace-nowrap transition"
+									className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded whitespace-nowrap transition"
 									onClick={() => runTest(index)}
 								>
 									Run
@@ -53,21 +53,21 @@ export const TestCases = ({ testCases, runTest, isMobile = false }: any) => {
 								{test.status === "pass" && (
 									<Check
 										size={isMobile ? 14 : 16}
-										className="text-purple-400"
+										className="text-purple-600"
 									/>
 								)}
 								{test.status === "fail" && (
 									<X size={isMobile ? 14 : 16} className="text-red-500" />
 								)}
 								{test.status === "pending" && (
-									<Clock size={isMobile ? 14 : 16} className="text-gray-500" />
+									<Clock size={isMobile ? 14 : 16} className="text-gray-400" />
 								)}
 							</div>
 						</div>
 						<div
 							className={`p-2 sm:p-3 ${
 								isMobile ? "text-xs" : "text-sm"
-							} space-y-2 bg-[#2c2c2c]`}
+							} space-y-2 bg-white`}
 						>
 							<div className="break-words">
 								<strong>Input:</strong>

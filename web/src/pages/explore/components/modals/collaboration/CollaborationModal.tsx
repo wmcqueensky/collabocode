@@ -63,11 +63,11 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-2 sm:p-4"
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4"
 			onClick={onClose}
 		>
 			<div
-				className="relative bg-[#1f1f1f] rounded-xl shadow-xl w-full max-w-4xl flex flex-col border border-[#3d3654] h-full max-h-[95vh] sm:max-h-[90vh] md:max-h-[85vh]"
+				className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl flex flex-col border border-gray-200 h-full max-h-[95vh] sm:max-h-[90vh] md:max-h-[85vh]"
 				onClick={(e) => e.stopPropagation()}
 			>
 				{/* Modal Header */}
@@ -79,7 +79,7 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 
 				{/* Error Display */}
 				{(error || problemsError) && (
-					<div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+					<div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
 						{error || problemsError}
 					</div>
 				)}
@@ -119,7 +119,7 @@ const CollaborationModal = ({ isOpen, onClose }: CollaborationModalProps) => {
 				</div>
 
 				{/* Modal Footer */}
-				<div className="sticky bottom-0 z-10 w-full bg-[#1f1f1f] rounded-b-xl">
+				<div className="sticky bottom-0 z-10 w-full bg-white rounded-b-xl">
 					<ModalFooter
 						step={step}
 						totalSteps={3}

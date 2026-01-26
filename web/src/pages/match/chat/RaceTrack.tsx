@@ -3,15 +3,15 @@ import { Avatar } from "./Avatar";
 
 export const RaceTrack = ({ participants, isMobile = false }: any) => {
 	return (
-		<div className="flex flex-col bg-[#2c2c2c] border-r border-gray-700">
+		<div className="flex flex-col bg-white border-r border-gray-200 rounded-lg">
 			{/* Header */}
-			<div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-700">
+			<div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
 				<h3
-					className={`text-gray-200 ${
+					className={`text-gray-900 ${
 						isMobile ? "text-xs" : "text-sm"
 					} font-medium flex items-center`}
 				>
-					<Trophy size={isMobile ? 14 : 16} className="mr-2 text-[#5bc6ca]" />
+					<Trophy size={isMobile ? 14 : 16} className="mr-2 text-sky-600" />
 					Race Progress
 				</h3>
 			</div>
@@ -45,14 +45,14 @@ export const RaceTrack = ({ participants, isMobile = false }: any) => {
 									>
 										<span
 											className={`font-medium truncate ${
-												isComplete ? "text-green-400" : "text-gray-200"
+												isComplete ? "text-green-600" : "text-gray-900"
 											}`}
 										>
 											{participant.name}
 										</span>
 										<span
 											className={`${isMobile ? "text-xs" : "text-xs"} ${
-												isComplete ? "text-green-400" : "text-gray-400"
+												isComplete ? "text-green-600" : "text-gray-500"
 											} ml-2 flex-shrink-0`}
 										>
 											{Math.round(participant.progress)}%
@@ -60,7 +60,7 @@ export const RaceTrack = ({ participants, isMobile = false }: any) => {
 									</div>
 
 									<div
-										className={`w-full bg-gray-700 rounded-full ${
+										className={`w-full bg-gray-200 rounded-full ${
 											isMobile ? "h-2" : "h-2.5"
 										} overflow-hidden`}
 									>
@@ -68,7 +68,7 @@ export const RaceTrack = ({ participants, isMobile = false }: any) => {
 											className={`h-full rounded-full transition-all duration-1000 ease-out ${
 												isComplete
 													? "bg-gradient-to-r from-green-500 to-green-400 animate-pulse"
-													: "bg-gradient-to-r from-[#5bc6ca] to-[#4a9ea0]"
+													: "bg-gradient-to-r from-sky-500 to-sky-400"
 											}`}
 											style={{ width: `${participant.progress}%` }}
 										/>

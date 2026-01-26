@@ -42,15 +42,15 @@ export const WaitingLobby = ({
 	});
 
 	return (
-		<div className="min-h-screen bg-[#171717] flex items-center justify-center p-4">
+		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
 			<div className="max-w-4xl w-full">
 				{/* Main Card */}
-				<div className="bg-[#1f1f1f] rounded-xl border border-gray-700 overflow-hidden">
+				<div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
 					{/* Header */}
 					<LobbyHeader isCollaboration={isCollaboration} />
 
 					{/* Session Info */}
-					<div className="p-6 border-b border-gray-700">
+					<div className="p-6 border-b border-gray-200">
 						<SessionInfoCard
 							session={session}
 							isCollaboration={isCollaboration}
@@ -64,7 +64,7 @@ export const WaitingLobby = ({
 
 					{/* Participants List */}
 					<div className="p-6">
-						<h3 className="text-lg font-semibold text-white mb-4">
+						<h3 className="text-lg font-semibold text-gray-900 mb-4">
 							{isCollaboration ? "Collaborators" : "Players"} (
 							{participants.length} / {session.max_players})
 						</h3>

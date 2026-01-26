@@ -4,13 +4,13 @@ import type { Profile } from "../../../../../../../types/database";
 import type { InvitePlayersStepProps } from "../../types";
 import { getLanguageDisplayName } from "../../constants";
 
-// Accent colors for competition modal (teal)
+// Accent colors for competition modal (sky blue)
 const ACCENT = {
-	bg: "bg-[#5bc6ca]",
-	bgLight: "bg-[#5bc6ca]/20",
-	text: "text-[#5bc6ca]",
-	border: "border-[#5bc6ca]",
-	focus: "focus:border-[#5bc6ca] focus:ring-[#5bc6ca]",
+	bg: "bg-sky-600",
+	bgLight: "bg-sky-100",
+	text: "text-sky-600",
+	border: "border-sky-600",
+	focus: "focus:border-sky-600 focus:ring-sky-600",
 };
 
 const InvitePlayersStep = ({
@@ -94,14 +94,14 @@ const InvitePlayersStep = ({
 	return (
 		<div className="p-4 sm:p-6">
 			{/* Session Info */}
-			<div className="bg-[#2a2a2a] rounded-lg p-4 mb-6 border border-gray-700">
-				<h3 className="font-medium text-white mb-3">Match Details</h3>
+			<div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
+				<h3 className="font-medium text-gray-900 mb-3">Match Details</h3>
 				<div className="grid grid-cols-3 gap-4 text-sm">
 					<div className="flex items-center">
 						<Code size={16} className={`${ACCENT.text} mr-2`} />
 						<div>
-							<div className="text-gray-400 text-xs">Problem</div>
-							<div className="text-white truncate">
+							<div className="text-gray-500 text-xs">Problem</div>
+							<div className="text-gray-900 truncate">
 								{selectedProblem?.title || "—"}
 							</div>
 						</div>
@@ -109,15 +109,15 @@ const InvitePlayersStep = ({
 					<div className="flex items-center">
 						<Clock size={16} className={`${ACCENT.text} mr-2`} />
 						<div>
-							<div className="text-gray-400 text-xs">Time</div>
-							<div className="text-white">{timeLimit} min</div>
+							<div className="text-gray-500 text-xs">Time</div>
+							<div className="text-gray-900">{timeLimit} min</div>
 						</div>
 					</div>
 					<div className="flex items-center">
 						<Code size={16} className={`${ACCENT.text} mr-2`} />
 						<div>
-							<div className="text-gray-400 text-xs">Language</div>
-							<div className="text-white">
+							<div className="text-gray-500 text-xs">Language</div>
+							<div className="text-gray-900">
 								{getLanguageDisplayName(selectedLanguage)}
 							</div>
 						</div>
@@ -128,16 +128,16 @@ const InvitePlayersStep = ({
 			{/* Invitation Progress */}
 			<div className="mb-6">
 				<div className="flex justify-between items-center mb-2">
-					<h3 className="text-white font-medium flex items-center">
+					<h3 className="text-gray-900 font-medium flex items-center">
 						<Users size={18} className={`${ACCENT.text} mr-2`} />
 						Invite Opponents
 					</h3>
-					<div className="text-sm text-gray-400">
+					<div className="text-sm text-gray-600">
 						{selectedPlayers.length} of {requiredPlayers} selected
 					</div>
 				</div>
 
-				<div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+				<div className="h-2 bg-gray-200 rounded-full overflow-hidden">
 					<div
 						className={`h-full ${ACCENT.bg} rounded-full transition-all duration-300`}
 						style={{
@@ -149,14 +149,14 @@ const InvitePlayersStep = ({
 					/>
 				</div>
 
-				<div className="text-sm mt-2 text-gray-300">
+				<div className="text-sm mt-2 text-gray-700">
 					{remainingPlayers > 0 ? (
 						<span>
 							Select {remainingPlayers} more{" "}
 							{remainingPlayers === 1 ? "opponent" : "opponents"}
 						</span>
 					) : (
-						<span className="text-green-400 flex items-center">
+						<span className="text-green-600 flex items-center">
 							<Check size={16} className="mr-1" />
 							All opponents selected! Ready to start.
 						</span>
@@ -169,7 +169,7 @@ const InvitePlayersStep = ({
 				<input
 					type="text"
 					placeholder="Search by name or username..."
-					className={`w-full bg-[#2a2a2a] border border-gray-700 rounded-lg py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 ${ACCENT.focus}`}
+					className={`w-full bg-white border border-gray-300 rounded-lg py-2.5 pl-10 pr-4 text-gray-900 focus:outline-none focus:ring-2 ${ACCENT.focus}`}
 					value={searchQuery}
 					onChange={(e) => handleSearch(e.target.value)}
 				/>
@@ -190,7 +190,7 @@ const InvitePlayersStep = ({
 						className={`p-3 rounded-lg border transition-all cursor-pointer ${
 							selectedPlayers.some((p) => p.id === player.id)
 								? `${ACCENT.border} ${ACCENT.bgLight}`
-								: "border-gray-700 bg-[#2a2a2a] hover:border-gray-500"
+								: "border-gray-200 bg-white hover:border-gray-400"
 						}`}
 						onClick={() => togglePlayerSelection(player)}
 					>
@@ -213,10 +213,10 @@ const InvitePlayersStep = ({
 								</div>
 
 								<div className="ml-3">
-									<div className="text-white font-medium">
+									<div className="text-gray-900 font-medium">
 										{player.full_name || player.username}
 									</div>
-									<div className="text-gray-400 text-sm">
+									<div className="text-gray-500 text-sm">
 										@{player.username}
 									</div>
 								</div>
@@ -227,17 +227,17 @@ const InvitePlayersStep = ({
 								className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
 									selectedPlayers.some((p) => p.id === player.id)
 										? ACCENT.bg
-										: "bg-gray-700"
+										: "bg-gray-200"
 								}`}
 							>
 								{selectedPlayers.some((p) => p.id === player.id) && (
-									<Check size={14} className="text-black" />
+									<Check size={14} className="text-white" />
 								)}
 							</div>
 						</div>
 
 						{/* Player Stats */}
-						<div className="mt-2 flex items-center text-xs text-gray-400">
+						<div className="mt-2 flex items-center text-xs text-gray-500">
 							<span className="mr-3">⭐ {player.rating || 1500}</span>
 							<span>🏆 {player.problems_solved || 0} solved</span>
 						</div>
@@ -245,7 +245,7 @@ const InvitePlayersStep = ({
 				))}
 
 				{displayPlayers.length === 0 && !searching && (
-					<div className="col-span-2 text-center py-10 text-gray-400">
+					<div className="col-span-2 text-center py-10 text-gray-500">
 						{searchQuery
 							? "No users found matching your search"
 							: "No users available"}

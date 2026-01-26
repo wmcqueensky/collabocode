@@ -1,18 +1,18 @@
 import type { ProgrammingLanguage, TimeOption } from "./types";
 
 export const ACCENT = {
-	bg: "bg-[#8b5cf6]",
-	bgLight: "bg-[#8b5cf6]/20",
-	bgLighter: "bg-[#8b5cf6]/10",
-	text: "text-[#a78bfa]",
-	border: "border-[#8b5cf6]",
-	borderLight: "border-[#8b5cf6]/30",
-	ring: "ring-[#8b5cf6]",
-	focus: "focus:border-[#8b5cf6] focus:ring-[#8b5cf6]",
-	hover: "hover:bg-[#7c3aed]",
+	bg: "bg-purple-600",
+	bgLight: "bg-purple-100",
+	bgLighter: "bg-purple-50",
+	text: "text-purple-600",
+	border: "border-purple-600",
+	borderLight: "border-purple-200",
+	ring: "ring-purple-600",
+	focus: "focus:border-purple-600 focus:ring-purple-600",
+	hover: "hover:bg-purple-700",
 } as const;
 
-export const VIOLET_ICON = "text-[#a78bfa]";
+export const VIOLET_ICON = "text-purple-600";
 
 export const PROGRAMMING_LANGUAGES: ProgrammingLanguage[] = [
 	{ value: "javascript", label: "JavaScript" },
@@ -56,15 +56,15 @@ export const getTeamSizeLabel = (count: number): string => {
 export const getDifficultyColor = (
 	difficulty: string | null | undefined,
 ): string => {
-	if (!difficulty) return "bg-gray-500/20 text-gray-400";
+	if (!difficulty) return "bg-gray-100 text-gray-600";
 	switch (String(difficulty).toLowerCase()) {
 		case "easy":
-			return "bg-green-500/20 text-green-400";
+			return "bg-green-100 text-green-700";
 		case "medium":
-			return "bg-yellow-500/20 text-yellow-400";
+			return "bg-yellow-100 text-yellow-700";
 		case "hard":
-			return "bg-red-500/20 text-red-400";
+			return "bg-red-100 text-red-700";
 		default:
-			return "bg-gray-500/20 text-gray-400";
+			return "bg-gray-100 text-gray-600";
 	}
 };

@@ -1,19 +1,19 @@
 const FinalCTA = () => {
 	return (
-		<section className="bg-[#171717] py-24 px-4 sm:px-6 relative overflow-hidden">
+		<section className="bg-white py-24 px-4 sm:px-6 relative overflow-hidden">
 			{/* Background gradient accents */}
-			<div className="absolute top-1/2 left-1/4 w-64 h-64 bg-[#5bc6ca]/10 rounded-full blur-3xl -translate-y-1/2" />
-			<div className="absolute top-1/2 right-1/4 w-64 h-64 bg-[#8b5cf6]/10 rounded-full blur-3xl -translate-y-1/2" />
+			<div className="absolute top-1/2 left-1/4 w-64 h-64 bg-sky-100 rounded-full blur-3xl -translate-y-1/2" />
+			<div className="absolute top-1/2 right-1/4 w-64 h-64 bg-purple-100 rounded-full blur-3xl -translate-y-1/2" />
 
 			<div className="max-w-3xl mx-auto text-center relative z-10">
-				<h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+				<h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
 					Ready to build better code{" "}
-					<span className="bg-gradient-to-r from-[#5bc6ca] to-[#a78bfa] bg-clip-text text-transparent">
+					<span className="bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent">
 						together
 					</span>
 					?
 				</h2>
-				<p className="text-gray-400 mb-8 max-w-xl mx-auto">
+				<p className="text-gray-600 mb-8 max-w-xl mx-auto">
 					Join thousands of developers who are leveling up their skills through
 					collaborative coding.
 				</p>
@@ -21,7 +21,7 @@ const FinalCTA = () => {
 				<div className="flex flex-wrap justify-center gap-4">
 					{/* Primary gradient button */}
 					<a href="/explore">
-						<button className="px-8 py-4 bg-gradient-to-r from-[#5bc6ca] to-[#8b5cf6] text-white font-semibold rounded-xl hover:opacity-90 transition shadow-lg shadow-[#5bc6ca]/20">
+						<button className="px-8 py-4 bg-gradient-to-r from-sky-600 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition shadow-lg shadow-sky-200">
 							Start Coding Together →
 						</button>
 					</a>

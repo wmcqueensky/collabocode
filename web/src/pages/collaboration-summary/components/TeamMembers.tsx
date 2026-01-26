@@ -18,8 +18,8 @@ export default function TeamMembers({
 	currentUserId,
 }: TeamMembersProps) {
 	return (
-		<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
-			<h3 className="text-xl font-semibold mb-4 flex items-center">
+		<div className="bg-white rounded-lg p-6 mb-6 border border-gray-200 shadow-sm">
+			<h3 className="text-xl font-semibold mb-4 flex items-center text-gray-900">
 				<Users className="mr-2 text-purple-500" size={20} />
 				Team Members
 			</h3>
@@ -27,7 +27,7 @@ export default function TeamMembers({
 				{teamMembers.map((member, index) => (
 					<div
 						key={index}
-						className={`flex items-center space-x-4 p-4 bg-[#1f1f1f] rounded-lg ${
+						className={`flex items-center space-x-4 p-4 bg-gray-50 rounded-lg ${
 							member.id === currentUserId ? "ring-2 ring-purple-500/50" : ""
 						}`}
 					>
@@ -36,10 +36,10 @@ export default function TeamMembers({
 						</div>
 						<div className="flex-1">
 							<div className="flex items-center justify-between">
-								<p className="font-medium text-white">
+								<p className="font-medium text-gray-900">
 									{member.name}
 									{member.id === currentUserId && (
-										<span className="text-purple-400 text-xs ml-2">(You)</span>
+										<span className="text-purple-600 text-xs ml-2">(You)</span>
 									)}
 								</p>
 								<div
@@ -58,9 +58,9 @@ export default function TeamMembers({
 									</span>
 								</div>
 							</div>
-							<div className="flex items-center space-x-3 text-sm text-gray-400">
+							<div className="flex items-center space-x-3 text-sm text-gray-500">
 								<span className="flex items-center">
-									<CheckCircle size={14} className="mr-1 text-green-400" />
+									<CheckCircle size={14} className="mr-1 text-green-500" />
 									{member.passedTests}/{member.totalTests} tests
 								</span>
 								<span className="flex items-center">

@@ -5,8 +5,8 @@ interface LobbyHeaderProps {
 }
 
 export const LobbyHeader = ({ isCollaboration }: LobbyHeaderProps) => {
-	const gradientFrom = isCollaboration ? "from-purple-500" : "from-[#5bc6ca]";
-	const gradientTo = isCollaboration ? "to-purple-600" : "to-[#48aeb3]";
+	const gradientFrom = isCollaboration ? "from-purple-500" : "from-sky-500";
+	const gradientTo = isCollaboration ? "to-purple-600" : "to-sky-600";
 
 	return (
 		<div

@@ -8,7 +8,7 @@ import FinalCTA from "./components/FinalCTA";
 
 const HomePage = () => {
 	return (
-		<main className="text-gray-200">
+		<main className="text-gray-700">
 			<Hero />
 			<Nav />
 			<WhyCollaborate />

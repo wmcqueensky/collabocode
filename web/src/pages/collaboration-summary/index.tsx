@@ -50,7 +50,7 @@ export default function CollaborationSummaryPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-[#171717] text-gray-200">
+		<div className="min-h-screen bg-gray-50 text-gray-700">
 			<Header />
 
 			{/* Main Content */}

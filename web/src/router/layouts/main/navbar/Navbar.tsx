@@ -58,7 +58,7 @@ const Navbar = () => {
 	}
 
 	return (
-		<header className="bg-[#1a1a1a] border-b border-gray-800 py-3 sticky top-0 z-50">
+		<header className="bg-white border-b border-gray-200 py-3 sticky top-0 z-50 shadow-sm">
 			<div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
 				{/* Logo */}
 				<div className="flex items-center space-x-2">
@@ -68,8 +68,8 @@ const Navbar = () => {
 					>
 						<h1 className="text-2xl font-bold flex items-center">
 							<LogoIcon />
-							<span className="text-white">Collabo</span>
-							<span className="text-[#5bc6ca]">Code</span>
+							<span className="text-gray-900">Collabo</span>
+							<span className="text-sky-600">Code</span>
 						</h1>
 					</button>
 				</div>
@@ -113,12 +113,12 @@ const Navbar = () => {
 					{/* Mobile Menu Toggle */}
 					<button
 						onClick={toggleMobileMenu}
-						className="md:hidden p-1 rounded-md text-gray-400 hover:text-white focus:outline-none"
+						className="md:hidden p-1 rounded-md text-gray-500 hover:text-gray-900 focus:outline-none"
 					>
 						{showMobileMenu ? (
-							<X size={24} className="text-gray-300" />
+							<X size={24} className="text-gray-600" />
 						) : (
-							<Menu size={24} className="text-gray-300" />
+							<Menu size={24} className="text-gray-600" />
 						)}
 					</button>
 				</div>

@@ -6,13 +6,13 @@ const Nav = () => {
 	};
 
 	return (
-		<nav className="sticky top-0 z-20 bg-[#171717]/95 backdrop-blur-sm border-b border-gray-700/50 shadow-sm text-sm">
+		<nav className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm text-sm">
 			<ul className="flex flex-wrap justify-center space-x-4 sm:space-x-6 py-3">
 				<li>
 					<a
 						href="#why-collaboration"
 						onClick={(e) => scrollToSection(e, "why-collaboration")}
-						className="text-gray-300 hover:text-[#a78bfa] transition-colors"
+						className="text-gray-600 hover:text-purple-600 transition-colors"
 					>
 						Why Collaborate
 					</a>
@@ -21,7 +21,7 @@ const Nav = () => {
 					<a
 						href="#our-story"
 						onClick={(e) => scrollToSection(e, "our-story")}
-						className="text-gray-300 hover:text-[#a78bfa] transition-colors"
+						className="text-gray-600 hover:text-purple-600 transition-colors"
 					>
 						Our Story
 					</a>
@@ -30,7 +30,7 @@ const Nav = () => {
 					<a
 						href="#how-it-works"
 						onClick={(e) => scrollToSection(e, "how-it-works")}
-						className="text-gray-300 hover:text-[#5bc6ca] transition-colors"
+						className="text-gray-600 hover:text-sky-600 transition-colors"
 					>
 						Modes
 					</a>
@@ -39,7 +39,7 @@ const Nav = () => {
 					<a
 						href="#features"
 						onClick={(e) => scrollToSection(e, "features")}
-						className="text-gray-300 hover:text-[#5bc6ca] transition-colors"
+						className="text-gray-600 hover:text-sky-600 transition-colors"
 					>
 						Features
 					</a>
@@ -47,7 +47,7 @@ const Nav = () => {
 				<li>
 					<a
 						href="/explore"
-						className="bg-gradient-to-r from-[#5bc6ca] to-[#8b5cf6] bg-clip-text text-transparent font-semibold hover:opacity-80 transition-opacity"
+						className="bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent font-semibold hover:opacity-80 transition-opacity"
 					>
 						Get Started →
 					</a>

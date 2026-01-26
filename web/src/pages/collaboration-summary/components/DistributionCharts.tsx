@@ -20,14 +20,14 @@ export default function DistributionCharts({
 	}
 
 	return (
-		<div className="bg-[#2c2c2c] rounded-lg p-6 mb-6 border border-gray-700">
-			<h3 className="text-xl font-semibold mb-4 flex items-center">
+		<div className="bg-white rounded-lg p-6 mb-6 border border-gray-200 shadow-sm">
+			<h3 className="text-xl font-semibold mb-4 flex items-center text-gray-900">
 				<Target className="mr-2 text-purple-500" size={20} />
 				How You Compare to Other Teams
 			</h3>
 
 			{teamEvaluation.percentiles && (
-				<p className="text-sm text-gray-400 mb-6">
+				<p className="text-sm text-gray-500 mb-6">
 					Compared against {teamEvaluation.percentiles.totalComparisons}{" "}
 					successful collaboration
 					{teamEvaluation.percentiles.totalComparisons !== 1 ? "s" : ""} on this
@@ -73,14 +73,14 @@ function RuntimeDistributionChart({
 	teamEvaluation,
 }: RuntimeDistributionChartProps) {
 	return (
-		<div className="bg-[#1f1f1f] rounded-lg p-4 mb-4">
+		<div className="bg-gray-50 rounded-lg p-4 mb-4">
 			<div className="flex items-center justify-between mb-4">
-				<h4 className="text-sm font-medium text-gray-300 flex items-center">
-					<Timer size={16} className="mr-2 text-green-400" />
+				<h4 className="text-sm font-medium text-gray-700 flex items-center">
+					<Timer size={16} className="mr-2 text-green-500" />
 					Runtime Distribution
 				</h4>
 				{teamEvaluation.percentiles && (
-					<span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full">
+					<span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
 						Beats {teamEvaluation.percentiles.timePercentile}%
 					</span>
 				)}
@@ -97,12 +97,12 @@ function RuntimeDistributionChart({
 							<span className="text-xs text-gray-500 w-16 text-right font-mono">
 								{bucket.range}
 							</span>
-							<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+							<div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden relative">
 								<div
 									className={`h-full rounded transition-all duration-500 ${
 										bucket.isYours
 											? "bg-gradient-to-r from-green-500 to-green-400"
-											: "bg-gray-600"
+											: "bg-gray-400"
 									}`}
 									style={{ width: `${width}%` }}
 								/>
@@ -122,11 +122,11 @@ function RuntimeDistributionChart({
 				})}
 			</div>
 
-			<div className="mt-4 pt-3 border-t border-gray-700">
+			<div className="mt-4 pt-3 border-t border-gray-200">
 				<div className="flex justify-between text-xs text-gray-500">
 					<span>
 						Your time:{" "}
-						<span className="text-green-400 font-medium">
+						<span className="text-green-600 font-medium">
 							{formatTime(teamEvaluation.solveTimeSeconds)}
 						</span>
 					</span>
@@ -151,14 +151,14 @@ function TimeComplexityChart({
 	teamEvaluation,
 }: TimeComplexityChartProps) {
 	return (
-		<div className="bg-[#1f1f1f] rounded-lg p-4">
+		<div className="bg-gray-50 rounded-lg p-4">
 			<div className="flex items-center justify-between mb-4">
-				<h4 className="text-sm font-medium text-gray-300 flex items-center">
-					<Zap size={16} className="mr-2 text-blue-400" />
+				<h4 className="text-sm font-medium text-gray-700 flex items-center">
+					<Zap size={16} className="mr-2 text-blue-500" />
 					Time Complexity Distribution
 				</h4>
 				{teamEvaluation.percentiles && (
-					<span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full">
+					<span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
 						Beats {teamEvaluation.percentiles.complexityPercentile}%
 					</span>
 				)}
@@ -178,12 +178,12 @@ function TimeComplexityChart({
 							<span className="text-xs text-gray-500 w-20 text-right font-mono">
 								{bucket.complexity}
 							</span>
-							<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+							<div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden relative">
 								<div
 									className={`h-full rounded transition-all duration-500 ${
 										bucket.isYours
 											? "bg-gradient-to-r from-blue-500 to-blue-400"
-											: "bg-gray-600"
+											: "bg-gray-400"
 									}`}
 									style={{ width: `${width}%` }}
 								/>
@@ -203,10 +203,10 @@ function TimeComplexityChart({
 				})}
 			</div>
 
-			<div className="mt-4 pt-3 border-t border-gray-700">
+			<div className="mt-4 pt-3 border-t border-gray-200">
 				<div className="text-xs text-gray-500">
 					Your complexity:{" "}
-					<span className="text-blue-400 font-medium">
+					<span className="text-blue-600 font-medium">
 						{teamEvaluation.complexity.timeComplexity}
 					</span>
 				</div>
@@ -225,10 +225,10 @@ function SpaceComplexityChart({
 	teamEvaluation,
 }: SpaceComplexityChartProps) {
 	return (
-		<div className="bg-[#1f1f1f] rounded-lg p-4">
+		<div className="bg-gray-50 rounded-lg p-4">
 			<div className="flex items-center justify-between mb-4">
-				<h4 className="text-sm font-medium text-gray-300 flex items-center">
-					<BarChart3 size={16} className="mr-2 text-yellow-400" />
+				<h4 className="text-sm font-medium text-gray-700 flex items-center">
+					<BarChart3 size={16} className="mr-2 text-yellow-500" />
 					Space Complexity Distribution
 				</h4>
 			</div>
@@ -247,12 +247,12 @@ function SpaceComplexityChart({
 							<span className="text-xs text-gray-500 w-20 text-right font-mono">
 								{bucket.complexity}
 							</span>
-							<div className="flex-1 h-6 bg-[#2a2a2a] rounded overflow-hidden relative">
+							<div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden relative">
 								<div
 									className={`h-full rounded transition-all duration-500 ${
 										bucket.isYours
 											? "bg-gradient-to-r from-yellow-500 to-yellow-400"
-											: "bg-gray-600"
+											: "bg-gray-400"
 									}`}
 									style={{ width: `${width}%` }}
 								/>
@@ -272,10 +272,10 @@ function SpaceComplexityChart({
 				})}
 			</div>
 
-			<div className="mt-4 pt-3 border-t border-gray-700">
+			<div className="mt-4 pt-3 border-t border-gray-200">
 				<div className="text-xs text-gray-500">
 					Your complexity:{" "}
-					<span className="text-yellow-400 font-medium">
+					<span className="text-yellow-600 font-medium">
 						{teamEvaluation.complexity.spaceComplexity}
 					</span>
 				</div>
@@ -292,32 +292,32 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 	if (!teamEvaluation.percentiles) return null;
 
 	return (
-		<div className="bg-[#1f1f1f] rounded-lg p-4">
-			<h4 className="text-sm font-medium text-gray-300 mb-4">
+		<div className="bg-gray-50 rounded-lg p-4">
+			<h4 className="text-sm font-medium text-gray-700 mb-4">
 				Performance Summary
 			</h4>
 
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-				<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
-					<div className="text-2xl font-bold text-green-400">
+				<div className="bg-white rounded-lg p-3 text-center border border-gray-200">
+					<div className="text-2xl font-bold text-green-600">
 						{teamEvaluation.percentiles.timePercentile}%
 					</div>
 					<div className="text-xs text-gray-500">Runtime Percentile</div>
 				</div>
-				<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
-					<div className="text-2xl font-bold text-blue-400">
+				<div className="bg-white rounded-lg p-3 text-center border border-gray-200">
+					<div className="text-2xl font-bold text-blue-600">
 						{teamEvaluation.percentiles.complexityPercentile}%
 					</div>
 					<div className="text-xs text-gray-500">Complexity Percentile</div>
 				</div>
-				<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
-					<div className="text-2xl font-bold text-purple-400">
+				<div className="bg-white rounded-lg p-3 text-center border border-gray-200">
+					<div className="text-2xl font-bold text-purple-600">
 						{formatTime(teamEvaluation.percentiles.fastestSolveTime)}
 					</div>
 					<div className="text-xs text-gray-500">Fastest Solution</div>
 				</div>
-				<div className="bg-[#2a2a2a] rounded-lg p-3 text-center">
-					<div className="text-2xl font-bold text-gray-400">
+				<div className="bg-white rounded-lg p-3 text-center border border-gray-200">
+					<div className="text-2xl font-bold text-gray-600">
 						{teamEvaluation.percentiles.totalComparisons}
 					</div>
 					<div className="text-xs text-gray-500">Total Solutions</div>
@@ -325,16 +325,16 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 			</div>
 
 			{/* Legend Section */}
-			<div className="border-t border-gray-700 pt-4">
-				<h5 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3 flex items-center">
+			<div className="border-t border-gray-200 pt-4">
+				<h5 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 flex items-center">
 					<Lightbulb size={12} className="mr-1" />
 					What These Metrics Mean
 				</h5>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-					<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
-						<div className="w-3 h-3 rounded-full bg-green-400 mt-0.5 flex-shrink-0" />
+					<div className="flex items-start gap-2 p-2 bg-white rounded border border-gray-200">
+						<div className="w-3 h-3 rounded-full bg-green-500 mt-0.5 flex-shrink-0" />
 						<div>
-							<span className="text-gray-300 font-medium">
+							<span className="text-gray-700 font-medium">
 								Runtime Percentile
 							</span>
 							<p className="text-gray-500 mt-0.5">
@@ -343,10 +343,10 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 							</p>
 						</div>
 					</div>
-					<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
-						<div className="w-3 h-3 rounded-full bg-blue-400 mt-0.5 flex-shrink-0" />
+					<div className="flex items-start gap-2 p-2 bg-white rounded border border-gray-200">
+						<div className="w-3 h-3 rounded-full bg-blue-500 mt-0.5 flex-shrink-0" />
 						<div>
-							<span className="text-gray-300 font-medium">
+							<span className="text-gray-700 font-medium">
 								Complexity Percentile
 							</span>
 							<p className="text-gray-500 mt-0.5">
@@ -355,10 +355,10 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 							</p>
 						</div>
 					</div>
-					<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
-						<div className="w-3 h-3 rounded-full bg-blue-400 mt-0.5 flex-shrink-0" />
+					<div className="flex items-start gap-2 p-2 bg-white rounded border border-gray-200">
+						<div className="w-3 h-3 rounded-full bg-blue-500 mt-0.5 flex-shrink-0" />
 						<div>
-							<span className="text-gray-300 font-medium">Time Complexity</span>
+							<span className="text-gray-700 font-medium">Time Complexity</span>
 							<p className="text-gray-500 mt-0.5">
 								How your algorithm's runtime scales with input size. O(n) is
 								linear, O(n²) is quadratic, O(log n) is logarithmic. Lower is
@@ -366,10 +366,10 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 							</p>
 						</div>
 					</div>
-					<div className="flex items-start gap-2 p-2 bg-[#2a2a2a] rounded">
-						<div className="w-3 h-3 rounded-full bg-yellow-400 mt-0.5 flex-shrink-0" />
+					<div className="flex items-start gap-2 p-2 bg-white rounded border border-gray-200">
+						<div className="w-3 h-3 rounded-full bg-yellow-500 mt-0.5 flex-shrink-0" />
 						<div>
-							<span className="text-gray-300 font-medium">
+							<span className="text-gray-700 font-medium">
 								Space Complexity
 							</span>
 							<p className="text-gray-500 mt-0.5">
@@ -382,30 +382,30 @@ function PercentileSummary({ teamEvaluation }: PercentileSummaryProps) {
 			</div>
 
 			{/* Chart Legend */}
-			<div className="border-t border-gray-700 pt-4 mt-4">
-				<h5 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+			<div className="border-t border-gray-200 pt-4 mt-4">
+				<h5 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
 					Chart Legend
 				</h5>
 				<div className="flex flex-wrap gap-4 text-xs">
 					<div className="flex items-center gap-2">
 						<div className="w-4 h-3 rounded bg-gradient-to-r from-green-500 to-green-400" />
-						<span className="text-gray-400">Your runtime</span>
+						<span className="text-gray-600">Your runtime</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<div className="w-4 h-3 rounded bg-gradient-to-r from-blue-500 to-blue-400" />
-						<span className="text-gray-400">Your time complexity</span>
+						<span className="text-gray-600">Your time complexity</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<div className="w-4 h-3 rounded bg-gradient-to-r from-yellow-500 to-yellow-400" />
-						<span className="text-gray-400">Your space complexity</span>
+						<span className="text-gray-600">Your space complexity</span>
 					</div>
 					<div className="flex items-center gap-2">
-						<div className="w-4 h-3 rounded bg-gray-600" />
-						<span className="text-gray-400">Other teams</span>
+						<div className="w-4 h-3 rounded bg-gray-400" />
+						<span className="text-gray-600">Other teams</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<span className="text-gray-500 font-mono">#</span>
-						<span className="text-gray-400">
+						<span className="text-gray-600">
 							Number of solutions in that range
 						</span>
 					</div>

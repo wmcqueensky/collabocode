@@ -11,44 +11,44 @@ interface LeaderboardProps {
 
 export default function Leaderboard({ players }: LeaderboardProps) {
 	return (
-		<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md mb-6 border border-gray-700">
-			<h3 className="text-xl font-semibold mb-4 flex items-center">
-				<Trophy className="mr-2 text-[#5bc6ca]" size={20} />
+		<div className="bg-white rounded-lg p-6 shadow-sm mb-6 border border-gray-200">
+			<h3 className="text-xl font-semibold mb-4 flex items-center text-gray-900">
+				<Trophy className="mr-2 text-sky-600" size={20} />
 				Leaderboard
 			</h3>
 
 			<div className="overflow-x-auto">
 				<table className="w-full">
 					<thead>
-						<tr className="border-b border-gray-600">
-							<th className="py-3 px-4 text-left text-gray-400 font-medium">
+						<tr className="border-b border-gray-200">
+							<th className="py-3 px-4 text-left text-gray-500 font-medium">
 								Player
 							</th>
-							<th className="py-3 px-4 text-center text-gray-400 font-medium">
+							<th className="py-3 px-4 text-center text-gray-500 font-medium">
 								<div className="flex flex-col items-center">
 									<Clock size={16} className="mb-1" />
 									<span>Time</span>
 								</div>
 							</th>
-							<th className="py-3 px-4 text-center text-gray-400 font-medium">
+							<th className="py-3 px-4 text-center text-gray-500 font-medium">
 								<div className="flex flex-col items-center">
 									<CheckCircle size={16} className="mb-1" />
 									<span>Tests Passed</span>
 								</div>
 							</th>
-							<th className="py-3 px-4 text-center text-gray-400 font-medium">
+							<th className="py-3 px-4 text-center text-gray-500 font-medium">
 								<div className="flex flex-col items-center">
 									<Zap size={16} className="mb-1" />
 									<span>Time Complexity</span>
 								</div>
 							</th>
-							<th className="py-3 px-4 text-center text-gray-400 font-medium">
+							<th className="py-3 px-4 text-center text-gray-500 font-medium">
 								<div className="flex flex-col items-center">
 									<Code size={16} className="mb-1" />
 									<span>Space Complexity</span>
 								</div>
 							</th>
-							<th className="py-3 px-4 text-center text-gray-400 font-medium">
+							<th className="py-3 px-4 text-center text-gray-500 font-medium">
 								<div className="flex flex-col items-center">
 									<Trophy size={16} className="mb-1" />
 									<span>Rating Change</span>
@@ -60,8 +60,8 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 						{players.map((player, index) => (
 							<tr
 								key={player.userId}
-								className={`border-b border-gray-700 ${
-									index === 0 ? "bg-[#5bc6ca]/10" : ""
+								className={`border-b border-gray-100 ${
+									index === 0 ? "bg-sky-50" : ""
 								}`}
 							>
 								{/* Player Name & Rank */}
@@ -69,15 +69,15 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 									<div className="flex items-center gap-3">
 										<div className="flex items-center gap-2">
 											{index === 0 && (
-												<Trophy size={18} className="text-[#FFD93D]" />
+												<Trophy size={18} className="text-yellow-500" />
 											)}
 											{index === 1 && (
-												<Trophy size={18} className="text-gray-300" />
+												<Trophy size={18} className="text-gray-400" />
 											)}
 											{index === 2 && (
-												<Trophy size={18} className="text-amber-700" />
+												<Trophy size={18} className="text-amber-600" />
 											)}
-											<span className="text-gray-400 font-mono">
+											<span className="text-gray-500 font-mono">
 												#{player.rank}
 											</span>
 										</div>
@@ -87,7 +87,7 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 										>
 											{player.initial}
 										</div>
-										<span className="font-medium text-white">
+										<span className="font-medium text-gray-900">
 											{player.name}
 										</span>
 									</div>
@@ -96,7 +96,7 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 								{/* Time */}
 								<td className="py-4 px-4 text-center">
 									<div className="flex flex-col items-center">
-										<span className="font-mono text-lg text-white">
+										<span className="font-mono text-lg text-gray-900">
 											{player.formattedTime !== "0:00"
 												? player.formattedTime
 												: "N/A"}
@@ -113,16 +113,16 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 								<td className="py-4 px-4 text-center">
 									<div className="flex flex-col items-center gap-2">
 										{/* Progress bar */}
-										<div className="w-full max-w-[120px] bg-gray-700 rounded-full h-2">
+										<div className="w-full max-w-[120px] bg-gray-200 rounded-full h-2">
 											<div
 												className={`h-2 rounded-full transition-all ${
 													player.passedTestCases === 100
-														? "bg-[#6BCB77]"
+														? "bg-green-500"
 														: player.passedTestCases >= 75
-															? "bg-[#FFD93D]"
+															? "bg-yellow-500"
 															: player.passedTestCases >= 50
-																? "bg-[#ffa726]"
-																: "bg-[#FF6B6B]"
+																? "bg-orange-500"
+																: "bg-red-500"
 												}`}
 												style={{ width: `${player.passedTestCases}%` }}
 											/>
@@ -132,12 +132,12 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 											<span
 												className={`font-medium ${
 													player.passedTestCases === 100
-														? "text-[#6BCB77]"
+														? "text-green-600"
 														: player.passedTestCases >= 75
-															? "text-[#FFD93D]"
+															? "text-yellow-600"
 															: player.passedTestCases >= 50
-																? "text-[#ffa726]"
-																: "text-[#FF6B6B]"
+																? "text-orange-600"
+																: "text-red-600"
 												}`}
 											>
 												{player.passedTestCount}/{player.totalTestCount}
@@ -178,16 +178,16 @@ export default function Leaderboard({ players }: LeaderboardProps) {
 											<span className="text-gray-500 text-sm">
 												{player.previousRating}
 											</span>
-											<span className="text-gray-600">→</span>
-											<span className="text-white font-medium">
+											<span className="text-gray-400">→</span>
+											<span className="text-gray-900 font-medium">
 												{player.currentRating}
 											</span>
 										</div>
 										<span
 											className={`text-sm font-bold ${
 												player.ratingChange > 0
-													? "text-green-400"
-													: "text-red-400"
+													? "text-green-600"
+													: "text-red-600"
 											}`}
 										>
 											{player.ratingChange > 0 ? "+" : ""}

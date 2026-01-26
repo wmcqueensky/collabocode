@@ -31,28 +31,28 @@ export const getLanguageDisplayName = (languageId: string): string => {
 export const getDifficultyColor = (
 	difficulty: string | null | undefined,
 ): string => {
-	if (!difficulty) return "text-gray-500";
+	if (!difficulty) return "text-gray-600";
 	switch (String(difficulty).toLowerCase()) {
 		case "easy":
-			return "text-green-500";
+			return "text-green-600";
 		case "medium":
-			return "text-yellow-500";
+			return "text-yellow-600";
 		case "hard":
-			return "text-red-500";
+			return "text-red-600";
 		default:
-			return "text-gray-500";
+			return "text-gray-600";
 	}
 };
 
 export const getDifficultyBadgeColor = (difficulty: string): string => {
 	switch ((difficulty || "").toLowerCase()) {
 		case "easy":
-			return "bg-green-600 text-white";
+			return "bg-green-100 text-green-700";
 		case "medium":
-			return "bg-yellow-600 text-white";
+			return "bg-yellow-100 text-yellow-700";
 		case "hard":
-			return "bg-red-600 text-white";
+			return "bg-red-100 text-red-700";
 		default:
-			return "bg-gray-600 text-white";
+			return "bg-gray-100 text-gray-700";
 	}
 };

@@ -17,23 +17,23 @@ const StatisticsGrid = ({
 }: StatisticsGridProps) => {
 	return (
 		<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
+			<div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
 				<div className="flex items-center space-x-2 mb-2">
-					<Target className="text-[#5bc6ca]" size={20} />
-					<span className="text-gray-400 text-sm">Total Solved</span>
+					<Target className="text-sky-600" size={20} />
+					<span className="text-gray-600 text-sm">Total Solved</span>
 				</div>
-				<p className="text-2xl font-bold">{totalSolved}</p>
+				<p className="text-2xl font-bold text-gray-900">{totalSolved}</p>
 				<p className="text-xs text-gray-500">
 					M: {matchSolved} | C: {collaborationSolved}
 				</p>
 			</div>
 
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
+			<div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
 				<div className="flex items-center space-x-2 mb-2">
 					<Award className="text-yellow-500" size={20} />
-					<span className="text-gray-400 text-sm">Match Win Rate</span>
+					<span className="text-gray-600 text-sm">Match Win Rate</span>
 				</div>
-				<p className="text-2xl font-bold">
+				<p className="text-2xl font-bold text-gray-900">
 					{statistics.matchWinRate.toFixed(1)}%
 				</p>
 				<p className="text-xs text-gray-500">
@@ -41,12 +41,12 @@ const StatisticsGrid = ({
 				</p>
 			</div>
 
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
+			<div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
 				<div className="flex items-center space-x-2 mb-2">
-					<CheckCircle className="text-[#a78bfa]" size={20} />
-					<span className="text-gray-400 text-sm">Collab Success</span>
+					<CheckCircle className="text-purple-600" size={20} />
+					<span className="text-gray-600 text-sm">Collab Success</span>
 				</div>
-				<p className="text-2xl font-bold">
+				<p className="text-2xl font-bold text-gray-900">
 					{statistics.collaborationSuccessRate.toFixed(1)}%
 				</p>
 				<p className="text-xs text-gray-500">
@@ -54,20 +54,24 @@ const StatisticsGrid = ({
 				</p>
 			</div>
 
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
+			<div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
 				<div className="flex items-center space-x-2 mb-2">
 					<Trophy className="text-yellow-500" size={20} />
-					<span className="text-gray-400 text-sm">Total Matches</span>
+					<span className="text-gray-600 text-sm">Total Matches</span>
 				</div>
-				<p className="text-2xl font-bold">{statistics.totalMatches}</p>
+				<p className="text-2xl font-bold text-gray-900">
+					{statistics.totalMatches}
+				</p>
 			</div>
 
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
+			<div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
 				<div className="flex items-center space-x-2 mb-2">
-					<Users className="text-[#a78bfa]" size={20} />
-					<span className="text-gray-400 text-sm">Collaborations</span>
+					<Users className="text-purple-600" size={20} />
+					<span className="text-gray-600 text-sm">Collaborations</span>
 				</div>
-				<p className="text-2xl font-bold">{statistics.totalCollaborations}</p>
+				<p className="text-2xl font-bold text-gray-900">
+					{statistics.totalCollaborations}
+				</p>
 			</div>
 		</div>
 	);

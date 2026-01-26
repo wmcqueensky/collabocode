@@ -58,7 +58,7 @@ const NotificationCenter = ({
 			<BellButton unreadCount={unreadCount} onClick={toggle} />
 
 			{isOpen && (
-				<div className="absolute right-0 mt-2 w-96 bg-[#252525] border border-gray-700 rounded-lg shadow-xl z-50 max-h-[80vh] overflow-hidden flex flex-col">
+				<div className="absolute right-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-[80vh] overflow-hidden flex flex-col">
 					<NotificationHeader onClose={close} />
 
 					<div className="flex-1 overflow-y-auto">

@@ -20,14 +20,14 @@ export const UserStatsDisplay = ({
 				<StatSkeleton />
 			) : (
 				<div
-					className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-yellow-500/50"
+					className="flex items-center space-x-1 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 transition-all duration-300 hover:border-yellow-400 hover:bg-yellow-50"
 					title="Match Rating"
 				>
 					<Trophy size={16} className="text-yellow-500" />
-					<span className="text-sm font-semibold text-white">
+					<span className="text-sm font-semibold text-gray-900">
 						{userStats.matchRating}
 					</span>
-					<span className="text-xs text-gray-400">Match</span>
+					<span className="text-xs text-gray-500">Match</span>
 				</div>
 			)}
 
@@ -36,14 +36,14 @@ export const UserStatsDisplay = ({
 				<StatSkeleton />
 			) : (
 				<div
-					className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-[#8b5cf6]/50"
+					className="flex items-center space-x-1 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 transition-all duration-300 hover:border-purple-400 hover:bg-purple-50"
 					title="Collaboration Rating"
 				>
-					<Users size={16} className="text-[#a78bfa]" />
-					<span className="text-sm font-semibold text-white">
+					<Users size={16} className="text-purple-500" />
+					<span className="text-sm font-semibold text-gray-900">
 						{userStats.collaborationRating}
 					</span>
-					<span className="text-xs text-gray-400">Collab</span>
+					<span className="text-xs text-gray-500">Collab</span>
 				</div>
 			)}
 
@@ -52,14 +52,14 @@ export const UserStatsDisplay = ({
 				<StatSkeleton />
 			) : (
 				<div
-					className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-[#5bc6ca]/50"
+					className="flex items-center space-x-1 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 transition-all duration-300 hover:border-sky-400 hover:bg-sky-50"
 					title={`Match: ${userStats.matchSolved} | Collab: ${userStats.collaborationSolved}`}
 				>
-					<Target size={16} className="text-[#5bc6ca]" />
-					<span className="text-sm font-semibold text-white">
+					<Target size={16} className="text-sky-600" />
+					<span className="text-sm font-semibold text-gray-900">
 						{totalSolved}
 					</span>
-					<span className="text-xs text-gray-400">solved</span>
+					<span className="text-xs text-gray-500">solved</span>
 				</div>
 			)}
 		</div>

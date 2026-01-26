@@ -17,10 +17,12 @@ const CollaborationHistoryTab = ({
 	if (history.length === 0) {
 		return (
 			<div>
-				<h3 className="text-lg font-semibold mb-4">Collaboration History</h3>
+				<h3 className="text-lg font-semibold text-gray-900 mb-4">
+					Collaboration History
+				</h3>
 				<div className="text-center py-12">
-					<Users size={48} className="text-gray-600 mx-auto mb-4" />
-					<p className="text-gray-400 mb-2">No collaboration history yet</p>
+					<Users size={48} className="text-gray-400 mx-auto mb-4" />
+					<p className="text-gray-600 mb-2">No collaboration history yet</p>
 					<p className="text-sm text-gray-500">
 						Start collaborating to see your history here
 					</p>
@@ -31,7 +33,9 @@ const CollaborationHistoryTab = ({
 
 	return (
 		<div>
-			<h3 className="text-lg font-semibold mb-4">Collaboration History</h3>
+			<h3 className="text-lg font-semibold text-gray-900 mb-4">
+				Collaboration History
+			</h3>
 			<div className="space-y-3">
 				{history.map((session) => (
 					<SessionHistoryItem

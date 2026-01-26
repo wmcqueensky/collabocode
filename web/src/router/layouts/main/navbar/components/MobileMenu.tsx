@@ -22,7 +22,7 @@ export const MobileMenu = ({
 	if (!showMobileMenu) return null;
 
 	return (
-		<div className="md:hidden bg-[#1a1a1a] px-4 pt-2 pb-4 border-t border-gray-800">
+		<div className="md:hidden bg-white px-4 pt-2 pb-4 border-t border-gray-200">
 			<nav className="space-y-1">
 				{user ? (
 					<>
@@ -30,13 +30,13 @@ export const MobileMenu = ({
 							to="/profile"
 							onClick={onCloseMenu}
 							className={`block w-full text-left py-2 ${
-								isActive("/profile") ? "text-[#5bc6ca]" : "text-gray-300"
+								isActive("/profile") ? "text-sky-600" : "text-gray-700"
 							}`}
 						>
 							Your Profile
 						</Link>
 						<button
-							className="block w-full text-left py-2 text-gray-300"
+							className="block w-full text-left py-2 text-gray-700"
 							onClick={onLogout}
 						>
 							Sign Out
@@ -49,7 +49,7 @@ export const MobileMenu = ({
 								onOpenModal("login");
 								onCloseMenu();
 							}}
-							className="block w-full text-left py-2 text-gray-300"
+							className="block w-full text-left py-2 text-gray-700"
 						>
 							Sign In
 						</button>
@@ -58,7 +58,7 @@ export const MobileMenu = ({
 								onOpenModal("register");
 								onCloseMenu();
 							}}
-							className="block w-full text-left py-2 text-[#5bc6ca]"
+							className="block w-full text-left py-2 text-sky-600"
 						>
 							Register
 						</button>

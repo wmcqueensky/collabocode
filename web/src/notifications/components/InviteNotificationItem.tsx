@@ -31,7 +31,7 @@ export const InviteNotificationItem = ({
 		<div className="flex items-start gap-3">
 			<div
 				className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-					isCollaboration ? "bg-purple-500" : "bg-[#5bc6ca]"
+					isCollaboration ? "bg-purple-500" : "bg-sky-500"
 				}`}
 			>
 				{isCollaboration ? (
@@ -42,22 +42,22 @@ export const InviteNotificationItem = ({
 			</div>
 
 			<div className="flex-1 min-w-0">
-				<p className="text-white font-medium">
+				<p className="text-gray-900 font-medium">
 					{isCollaboration ? "Collaboration Invite" : "Coding Session Invite"}
 				</p>
-				<p className="text-sm text-gray-400 mt-1">
+				<p className="text-sm text-gray-500 mt-1">
 					<span
-						className={isCollaboration ? "text-purple-400" : "text-[#5bc6ca]"}
+						className={isCollaboration ? "text-purple-600" : "text-sky-600"}
 					>
 						@{notification.session.host?.username}
 					</span>{" "}
 					invited you to {isCollaboration ? "collaborate on" : "solve"}{" "}
-					<span className="text-white">
+					<span className="text-gray-900">
 						{notification.session.problem?.title}
 					</span>
 				</p>
 
-				<div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
+				<div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
 					<span className="flex items-center">
 						<Clock size={12} className="mr-1" />
 						{notification.session.time_limit} min
@@ -82,7 +82,7 @@ export const InviteNotificationItem = ({
 						className={`flex-1 px-3 py-1.5 text-white text-sm rounded-md flex items-center justify-center gap-1 transition ${
 							isCollaboration
 								? "bg-purple-500 hover:bg-purple-600"
-								: "bg-[#5bc6ca] hover:bg-[#48aeb3]"
+								: "bg-sky-500 hover:bg-sky-600"
 						}`}
 					>
 						<Check size={14} />
@@ -90,7 +90,7 @@ export const InviteNotificationItem = ({
 					</button>
 					<button
 						onClick={() => onDecline(notification)}
-						className="flex-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-md flex items-center justify-center gap-1 transition"
+						className="flex-1 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md flex items-center justify-center gap-1 transition"
 					>
 						<X size={14} />
 						Decline

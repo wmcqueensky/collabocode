@@ -1,14 +1,14 @@
-// Match page accent colors (teal theme)
+// Match page accent colors (sky theme)
 export const ACCENT = {
-	bg: "bg-[#5bc6ca]",
-	bgHover: "hover:bg-[#48aeb3]",
-	bgLight: "bg-[#5bc6ca]/10",
-	bgDark: "bg-[#2a5a5c]",
-	bgDarkHover: "hover:bg-[#39767a]",
-	text: "text-[#5bc6ca]",
-	border: "border-[#5bc6ca]",
-	ring: "ring-[#5bc6ca]",
-	focus: "focus:ring-[#5bc6ca]",
+	bg: "bg-sky-600",
+	bgHover: "hover:bg-sky-700",
+	bgLight: "bg-sky-50",
+	bgDark: "bg-sky-700",
+	bgDarkHover: "hover:bg-sky-800",
+	text: "text-sky-600",
+	border: "border-sky-600",
+	ring: "ring-sky-600",
+	focus: "focus:ring-sky-600",
 } as const;
 
 // Default output message

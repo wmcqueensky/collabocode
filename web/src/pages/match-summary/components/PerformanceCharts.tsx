@@ -25,12 +25,12 @@ export default function PerformanceCharts({ players }: PerformanceChartsProps) {
 			formattedTime: player.formattedTime,
 			fill:
 				player.timeToSolve <= 180 // 3 minutes - excellent
-					? "#6BCB77"
+					? "#22c55e"
 					: player.timeToSolve <= 300 // 5 minutes - good
-						? "#FFD93D"
+						? "#eab308"
 						: player.timeToSolve <= 600 // 10 minutes - okay
-							? "#ffa726"
-							: "#FF6B6B", // slow
+							? "#f97316"
+							: "#ef4444", // slow
 		}))
 		.sort((a, b) => a.time - b.time);
 
@@ -41,21 +41,21 @@ export default function PerformanceCharts({ players }: PerformanceChartsProps) {
 			score: player.codeQualityScore,
 			fill:
 				player.codeQualityScore >= 100
-					? "#6BCB77"
+					? "#22c55e"
 					: player.codeQualityScore >= 75
-						? "#FFD93D"
+						? "#eab308"
 						: player.codeQualityScore >= 50
-							? "#ffa726"
-							: "#FF6B6B",
+							? "#f97316"
+							: "#ef4444",
 		}))
 		.sort((a, b) => b.score - a.score);
 
 	return (
 		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 			{/* Time Performance Chart */}
-			<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
-				<h3 className="text-xl font-semibold mb-4 flex items-center">
-					<Clock className="mr-2 text-[#5bc6ca]" size={20} />
+			<div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+				<h3 className="text-xl font-semibold mb-4 flex items-center text-gray-900">
+					<Clock className="mr-2 text-sky-600" size={20} />
 					Solution Time
 				</h3>
 				<div className="h-64">
@@ -65,24 +65,24 @@ export default function PerformanceCharts({ players }: PerformanceChartsProps) {
 							layout="vertical"
 							margin={{ top: 5, right: 30, left: 70, bottom: 10 }}
 						>
-							<CartesianGrid strokeDasharray="3 3" stroke="#444" />
+							<CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
 							<XAxis
 								type="number"
-								stroke="#999"
+								stroke="#6b7280"
 								domain={[0, "auto"]}
 								label={{
 									value: "Time (seconds)",
 									position: "insideBottom",
 									offset: -5,
-									fill: "#999",
+									fill: "#6b7280",
 								}}
 							/>
-							<YAxis dataKey="name" type="category" stroke="#999" />
+							<YAxis dataKey="name" type="category" stroke="#6b7280" />
 							<Tooltip
 								contentStyle={{
-									backgroundColor: "#2c2c2c",
-									borderColor: "#5bc6ca",
-									color: "white",
+									backgroundColor: "#ffffff",
+									borderColor: "#0ea5e9",
+									color: "#111827",
 								}}
 								formatter={(value, _name) => {
 									const entry = timePerformanceData.find(
@@ -102,9 +102,9 @@ export default function PerformanceCharts({ players }: PerformanceChartsProps) {
 			</div>
 
 			{/* Test Pass Rate Chart */}
-			<div className="bg-[#2c2c2c] rounded-lg p-6 shadow-md border border-gray-700">
-				<h3 className="text-xl font-semibold mb-4 flex items-center">
-					<Code className="mr-2 text-[#5bc6ca]" size={20} />
+			<div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+				<h3 className="text-xl font-semibold mb-4 flex items-center text-gray-900">
+					<Code className="mr-2 text-sky-600" size={20} />
 					Test Pass Rate
 				</h3>
 				<div className="h-64">
@@ -114,24 +114,24 @@ export default function PerformanceCharts({ players }: PerformanceChartsProps) {
 							layout="vertical"
 							margin={{ top: 5, right: 30, left: 70, bottom: 10 }}
 						>
-							<CartesianGrid strokeDasharray="3 3" stroke="#444" />
+							<CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
 							<XAxis
 								type="number"
-								stroke="#999"
+								stroke="#6b7280"
 								domain={[0, 100]}
 								label={{
 									value: "Pass Rate %",
 									position: "insideBottom",
 									offset: -5,
-									fill: "#999",
+									fill: "#6b7280",
 								}}
 							/>
-							<YAxis dataKey="name" type="category" stroke="#999" />
+							<YAxis dataKey="name" type="category" stroke="#6b7280" />
 							<Tooltip
 								contentStyle={{
-									backgroundColor: "#2c2c2c",
-									borderColor: "#5bc6ca",
-									color: "white",
+									backgroundColor: "#ffffff",
+									borderColor: "#0ea5e9",
+									color: "#111827",
 								}}
 								formatter={(value) => [`${value}%`, "Pass Rate"]}
 							/>

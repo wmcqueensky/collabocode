@@ -42,7 +42,7 @@ const ProfilePage = () => {
 	}
 
 	return (
-		<div className="min-h-screen bg-[#0f0f0f] text-white">
+		<div className="min-h-screen bg-gray-50 text-gray-900">
 			<div className="max-w-7xl mx-auto px-4 py-8">
 				<ProfileHeader
 					profile={profile}
@@ -60,7 +60,7 @@ const ProfilePage = () => {
 				/>
 
 				{/* Tabs Container */}
-				<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 overflow-hidden">
+				<div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
 					<ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
 					<div className="p-6">

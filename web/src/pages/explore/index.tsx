@@ -11,7 +11,7 @@ const ExplorePage = () => {
 	const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
 
 	return (
-		<main className="min-h-screen bg-[#171717] text-gray-200">
+		<main className="min-h-screen bg-white text-gray-900">
 			{/* Main Dashboard */}
 			<div className="max-w-6xl mx-auto px-4 py-12">
 				<PageTitle
@@ -41,7 +41,7 @@ const ExplorePage = () => {
 								</div>
 							</>
 						}
-						icon={<Code size={20} className="text-[#5bc6ca]" />}
+						icon={<Code size={20} className="text-sky-600" />}
 						features={[
 							{ icon: <Clock size={16} />, text: "Timed battles" },
 							{ icon: <Users size={16} />, text: "2-4 competitors" },

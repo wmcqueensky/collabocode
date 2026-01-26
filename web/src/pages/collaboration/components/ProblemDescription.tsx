@@ -9,7 +9,7 @@ export const ProblemDescription = ({
 }) => {
 	if (!problem) {
 		return (
-			<div className="flex items-center justify-center h-64 text-gray-400">
+			<div className="flex items-center justify-center h-64 text-gray-500">
 				Loading problem...
 			</div>
 		);
@@ -19,26 +19,26 @@ export const ProblemDescription = ({
 	const getDifficultyColor = (difficulty: string) => {
 		switch (difficulty.toLowerCase()) {
 			case "easy":
-				return "bg-green-900/30 text-green-400";
+				return "bg-green-100 text-green-700";
 			case "medium":
-				return "bg-yellow-900/30 text-yellow-400";
+				return "bg-yellow-100 text-yellow-700";
 			case "hard":
-				return "bg-red-900/30 text-red-400";
+				return "bg-red-100 text-red-700";
 			default:
-				return "bg-gray-700 text-gray-300";
+				return "bg-gray-100 text-gray-600";
 		}
 	};
 
 	return (
 		<div
-			className={`space-y-3 sm:space-y-4 text-gray-300 ${
+			className={`space-y-3 sm:space-y-4 text-gray-700 ${
 				isMobile ? "text-sm" : ""
 			}`}
 		>
 			<h2
 				className={`${
 					isMobile ? "text-lg" : "text-xl"
-				} font-medium text-gray-200`}
+				} font-medium text-gray-900`}
 			>
 				{problem.title}
 			</h2>
@@ -55,7 +55,7 @@ export const ProblemDescription = ({
 				{problem.tags.map((tag, index) => (
 					<span
 						key={index}
-						className="bg-gray-700 text-gray-300 px-2 py-0.5 rounded text-xs"
+						className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs"
 					>
 						{tag}
 					</span>
@@ -76,7 +76,7 @@ export const ProblemDescription = ({
 			{problem.test_cases && problem.test_cases.length > 0 && (
 				<div className="space-y-3">
 					<h3
-						className={`font-medium text-gray-200 ${
+						className={`font-medium text-gray-900 ${
 							isMobile ? "text-sm" : "text-base"
 						}`}
 					>
@@ -87,19 +87,19 @@ export const ProblemDescription = ({
 						.map((testCase: any, index: number) => (
 							<div
 								key={index}
-								className={`bg-[#171717] p-2 sm:p-3 rounded-md ${
+								className={`bg-gray-50 p-2 sm:p-3 rounded-md ${
 									isMobile ? "text-xs" : "text-sm"
-								} space-y-1`}
+								} space-y-1 border border-gray-200`}
 							>
 								<p>
 									<strong>Input:</strong>{" "}
-									<code className="bg-gray-800 px-1 rounded">
+									<code className="bg-gray-200 px-1 rounded">
 										{JSON.stringify(testCase.input)}
 									</code>
 								</p>
 								<p>
 									<strong>Output:</strong>{" "}
-									<code className="bg-gray-800 px-1 rounded">
+									<code className="bg-gray-200 px-1 rounded">
 										{JSON.stringify(testCase.output)}
 									</code>
 								</p>
@@ -109,9 +109,9 @@ export const ProblemDescription = ({
 			)}
 
 			{/* Additional Info */}
-			<div className="space-y-2 pt-4 border-t border-gray-700">
+			<div className="space-y-2 pt-4 border-t border-gray-200">
 				<h3
-					className={`font-medium text-gray-200 ${
+					className={`font-medium text-gray-900 ${
 						isMobile ? "text-sm" : "text-base"
 					}`}
 				>
@@ -138,14 +138,14 @@ function formatDescription(description: string): string {
 			if (p.includes("```")) {
 				return p.replace(
 					/```(\w+)?\n([\s\S]*?)```/g,
-					'<pre class="bg-gray-800 p-3 rounded-md overflow-x-auto"><code>$2</code></pre>',
+					'<pre class="bg-gray-100 p-3 rounded-md overflow-x-auto border border-gray-200"><code>$2</code></pre>',
 				);
 			}
 
 			// Handle inline code
 			p = p.replace(
 				/`([^`]+)`/g,
-				'<code class="bg-gray-800 px-1 rounded">$1</code>',
+				'<code class="bg-gray-200 px-1 rounded">$1</code>',
 			);
 
 			// Handle bold

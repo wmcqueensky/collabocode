@@ -32,9 +32,9 @@ export const getMonacoLanguage = (language: string): string => {
 };
 
 export const getRatingChangeColor = (change: number): string => {
-	if (change > 0) return "text-green-400";
-	if (change < 0) return "text-red-400";
-	return "text-gray-400";
+	if (change > 0) return "text-green-600";
+	if (change < 0) return "text-red-600";
+	return "text-gray-500";
 };
 
 export const getComplexityScore = (complexity: ComplexityAnalysis): number => {

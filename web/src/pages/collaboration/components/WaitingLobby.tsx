@@ -41,7 +41,7 @@ const getStatusIcon = (status: string) => {
 		case "invited":
 			return <Loader2 size={20} className="text-yellow-500 animate-spin" />;
 		default:
-			return <Users size={20} className="text-gray-500" />;
+			return <Users size={20} className="text-gray-400" />;
 	}
 };
 
@@ -49,11 +49,11 @@ const getStatusIcon = (status: string) => {
 const getStatusText = (status: string) => {
 	switch (status) {
 		case "joined":
-			return <span className="text-green-500">Ready</span>;
+			return <span className="text-green-600">Ready</span>;
 		case "declined":
-			return <span className="text-red-500">Declined</span>;
+			return <span className="text-red-600">Declined</span>;
 		case "invited":
-			return <span className="text-yellow-500">Waiting...</span>;
+			return <span className="text-yellow-600">Waiting...</span>;
 		default:
 			return <span className="text-gray-500">Pending</span>;
 	}
@@ -73,10 +73,10 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 	onStartSession,
 }) => {
 	return (
-		<div className="min-h-screen bg-[#171717] flex items-center justify-center p-4">
+		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
 			<div className="max-w-4xl w-full">
 				{/* Main Card */}
-				<div className="bg-[#1f1f1f] rounded-xl border border-gray-700 overflow-hidden">
+				<div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
 					{/* Header */}
 					<div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-center">
 						<div className="flex items-center justify-center mb-2">
@@ -91,32 +91,32 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 					</div>
 
 					{/* Session Info */}
-					<div className="p-6 border-b border-gray-700">
+					<div className="p-6 border-b border-gray-200">
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-							<div className="bg-[#2a2a2a] rounded-lg p-4">
-								<div className="flex items-center text-gray-400 mb-1">
+							<div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+								<div className="flex items-center text-gray-500 mb-1">
 									<Code size={16} className="mr-2" />
 									<span className="text-sm">Project</span>
 								</div>
-								<p className="text-white font-medium truncate">
+								<p className="text-gray-900 font-medium truncate">
 									{session.problem?.title || "Loading..."}
 								</p>
 							</div>
-							<div className="bg-[#2a2a2a] rounded-lg p-4">
-								<div className="flex items-center text-gray-400 mb-1">
+							<div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+								<div className="flex items-center text-gray-500 mb-1">
 									<Clock size={16} className="mr-2" />
 									<span className="text-sm">Time Limit</span>
 								</div>
-								<p className="text-white font-medium">
+								<p className="text-gray-900 font-medium">
 									{session.time_limit} minutes
 								</p>
 							</div>
-							<div className="bg-[#2a2a2a] rounded-lg p-4">
-								<div className="flex items-center text-gray-400 mb-1">
+							<div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+								<div className="flex items-center text-gray-500 mb-1">
 									<Code size={16} className="mr-2" />
 									<span className="text-sm">Language</span>
 								</div>
-								<p className="text-white font-medium capitalize">
+								<p className="text-gray-900 font-medium capitalize">
 									{session.language}
 								</p>
 							</div>
@@ -125,14 +125,14 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 						{/* Progress Bar */}
 						<div>
 							<div className="flex justify-between items-center mb-2">
-								<span className="text-sm text-gray-400">
+								<span className="text-sm text-gray-600">
 									Collaborator Status
 								</span>
-								<span className="text-sm text-gray-400">
+								<span className="text-sm text-gray-600">
 									{joinedCount} / {session.max_players} ready
 								</span>
 							</div>
-							<div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+							<div className="h-2 bg-gray-200 rounded-full overflow-hidden">
 								<div
 									className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500"
 									style={{
@@ -145,7 +145,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 
 					{/* Participants List */}
 					<div className="p-6">
-						<h3 className="text-lg font-semibold text-white mb-4">
+						<h3 className="text-lg font-semibold text-gray-900 mb-4">
 							Collaborators ({participants.length} / {session.max_players})
 						</h3>
 						<div className="space-y-3">
@@ -158,8 +158,8 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 										key={participant.id}
 										className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
 											isCurrentUser
-												? "bg-purple-500/10 border-purple-500"
-												: "bg-[#2a2a2a] border-gray-700"
+												? "bg-purple-50 border-purple-400"
+												: "bg-white border-gray-200"
 										}`}
 									>
 										<div className="flex items-center space-x-3 flex-1">
@@ -185,10 +185,10 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 											{/* User Info */}
 											<div className="flex-1 min-w-0">
 												<div className="flex items-center space-x-2">
-													<p className="text-white font-medium truncate">
+													<p className="text-gray-900 font-medium truncate">
 														{user?.username || "Unknown"}
 														{isCurrentUser && (
-															<span className="text-purple-400 ml-2">
+															<span className="text-purple-600 ml-2">
 																(You)
 															</span>
 														)}
@@ -199,7 +199,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 														)}
 													</p>
 												</div>
-												<div className="flex items-center space-x-3 text-sm text-gray-400">
+												<div className="flex items-center space-x-3 text-sm text-gray-500">
 													<span>⭐ {user?.rating || 1500}</span>
 													<span>🏆 {user?.problems_solved || 0}</span>
 												</div>
@@ -220,31 +220,31 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 							}).map((_, index) => (
 								<div
 									key={`empty-${index}`}
-									className="flex items-center justify-between p-4 rounded-lg border border-dashed border-gray-700 bg-[#2a2a2a]/50"
+									className="flex items-center justify-between p-4 rounded-lg border border-dashed border-gray-300 bg-gray-50"
 								>
 									<div className="flex items-center space-x-3">
-										<div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
-											<Users size={24} className="text-gray-500" />
+										<div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+											<Users size={24} className="text-gray-400" />
 										</div>
 										<div>
 											<p className="text-gray-500 font-medium">
 												Waiting for collaborator...
 											</p>
-											<p className="text-sm text-gray-600">Slot available</p>
+											<p className="text-sm text-gray-400">Slot available</p>
 										</div>
 									</div>
-									<span className="text-gray-600">Empty</span>
+									<span className="text-gray-400">Empty</span>
 								</div>
 							))}
 						</div>
 					</div>
 
 					{/* Footer */}
-					<div className="p-6 bg-[#2a2a2a] border-t border-gray-700">
+					<div className="p-6 bg-gray-50 border-t border-gray-200">
 						<div className="flex flex-col sm:flex-row items-center justify-between gap-4">
 							<div className="text-center sm:text-left">
-								<p className="text-gray-400 text-sm">Time elapsed</p>
-								<p className="text-white font-mono text-lg">
+								<p className="text-gray-500 text-sm">Time elapsed</p>
+								<p className="text-gray-900 font-mono text-lg">
 									{formatTime(timeElapsed)}
 								</p>
 							</div>
@@ -252,14 +252,14 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 							{/* Status Messages */}
 							<div className="text-center flex-1">
 								{allPlayersJoined ? (
-									<div className="flex items-center justify-center text-green-500">
+									<div className="flex items-center justify-center text-green-600">
 										<CheckCircle size={20} className="mr-2" />
 										<span className="font-medium">
 											All collaborators ready!
 										</span>
 									</div>
 								) : invitedCount > 0 ? (
-									<div className="flex items-center justify-center text-yellow-500">
+									<div className="flex items-center justify-center text-yellow-600">
 										<Loader2 size={20} className="mr-2 animate-spin" />
 										<span>
 											Waiting for {invitedCount}{" "}
@@ -267,7 +267,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 										</span>
 									</div>
 								) : (
-									<div className="text-gray-400">
+									<div className="text-gray-500">
 										<span>Waiting for more collaborators to join...</span>
 									</div>
 								)}
@@ -282,14 +282,14 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 										className={`px-6 py-2 rounded-lg font-medium transition-all ${
 											canStart
 												? "bg-purple-500 hover:bg-purple-600 text-white"
-												: "bg-gray-700 text-gray-500 cursor-not-allowed"
+												: "bg-gray-200 text-gray-400 cursor-not-allowed"
 										}`}
 									>
 										{allPlayersJoined ? "Start Session" : "Start Anyway"}
 									</button>
 								)}
 								{!isHost && (
-									<div className="text-gray-400 text-sm italic">
+									<div className="text-gray-500 text-sm italic">
 										Waiting for host to start...
 									</div>
 								)}
@@ -298,8 +298,8 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 
 						{/* Additional Info */}
 						{isHost && !allPlayersJoined && joinedCount >= 2 && (
-							<div className="mt-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-								<p className="text-sm text-center text-purple-400">
+							<div className="mt-4 p-3 rounded-lg bg-purple-50 border border-purple-200">
+								<p className="text-sm text-center text-purple-700">
 									💡 You can start the session now with {joinedCount}{" "}
 									collaborators, or wait for more to join
 								</p>
@@ -307,8 +307,8 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 						)}
 
 						{declinedCount > 0 && (
-							<div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-								<p className="text-red-400 text-sm text-center">
+							<div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+								<p className="text-red-700 text-sm text-center">
 									{declinedCount} {declinedCount === 1 ? "person" : "people"}{" "}
 									declined the invitation
 								</p>
@@ -317,7 +317,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
 
 						{/* Session Type Badge */}
 						<div className="mt-4 text-center">
-							<span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+							<span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
 								🤝 Collaboration Mode • Closed Session
 							</span>
 						</div>

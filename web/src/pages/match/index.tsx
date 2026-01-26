@@ -86,8 +86,8 @@ const MatchPage = () => {
 	// Loading state
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-screen bg-[#171717]">
-				<div className="text-white text-xl">Loading session...</div>
+			<div className="flex items-center justify-center h-screen bg-gray-50">
+				<div className="text-gray-700 text-xl">Loading session...</div>
 			</div>
 		);
 	}
@@ -95,13 +95,13 @@ const MatchPage = () => {
 	// Error state
 	if (error || !session) {
 		return (
-			<div className="flex flex-col items-center justify-center h-screen bg-[#171717]">
-				<div className="text-red-400 text-xl mb-4">
+			<div className="flex flex-col items-center justify-center h-screen bg-gray-50">
+				<div className="text-red-500 text-xl mb-4">
 					{error || "Session not found"}
 				</div>
 				<a
 					href="/explore"
-					className="bg-[#5bc6ca] hover:bg-[#48aeb3] text-white px-6 py-2 rounded"
+					className="bg-sky-600 hover:bg-sky-700 text-white px-6 py-2 rounded"
 				>
 					Back to Explore
 				</a>
@@ -129,7 +129,7 @@ const MatchPage = () => {
 	};
 
 	return (
-		<div className="flex flex-col h-screen bg-[#171717] text-gray-200">
+		<div className="flex flex-col h-screen bg-gray-50 text-gray-900">
 			{/* Submission Modal */}
 			{submissionResult && (
 				<SubmissionModal
@@ -156,12 +156,12 @@ const MatchPage = () => {
 			/>
 
 			{/* Mobile Panel Navigation */}
-			<div className="md:hidden flex bg-[#2c2c2c] border-b border-gray-700">
+			<div className="md:hidden flex bg-white border-b border-gray-200">
 				<button
 					className={`flex-1 py-2 px-4 text-sm ${
 						activePanel === "problem"
-							? "border-b-2 border-[#5bc6ca] text-[#5bc6ca]"
-							: "text-gray-400"
+							? "border-b-2 border-sky-600 text-sky-600"
+							: "text-gray-500"
 					}`}
 					onClick={() => setActivePanel("problem")}
 				>
@@ -170,8 +170,8 @@ const MatchPage = () => {
 				<button
 					className={`flex-1 py-2 px-4 text-sm ${
 						activePanel === "editor"
-							? "border-b-2 border-[#5bc6ca] text-[#5bc6ca]"
-							: "text-gray-400"
+							? "border-b-2 border-sky-600 text-sky-600"
+							: "text-gray-500"
 					}`}
 					onClick={() => setActivePanel("editor")}
 				>
@@ -180,8 +180,8 @@ const MatchPage = () => {
 				<button
 					className={`flex-1 py-2 px-4 text-sm ${
 						activePanel === "chat"
-							? "border-b-2 border-[#5bc6ca] text-[#5bc6ca]"
-							: "text-gray-400"
+							? "border-b-2 border-sky-600 text-sky-600"
+							: "text-gray-500"
 					}`}
 					onClick={() => setActivePanel("chat")}
 				>
@@ -203,7 +203,7 @@ const MatchPage = () => {
 					/>
 
 					{/* Middle Section - Code Editor */}
-					<div className="flex flex-1 overflow-hidden border-l border-r border-gray-700">
+					<div className="flex flex-1 overflow-hidden border-l border-r border-gray-200">
 						<div className="flex flex-col flex-1">
 							<MonacoEditor
 								file={file}
@@ -217,7 +217,7 @@ const MatchPage = () => {
 
 					{/* Right Panel - Chat */}
 					{isChatOpen && (
-						<div className="w-80 bg-[#1a1a1a] border-l border-gray-700 flex flex-col">
+						<div className="w-80 bg-white border-l border-gray-200 flex flex-col">
 							<div className="flex-1 min-h-0 max-h-[60%]">
 								<ChatPanel
 									messages={chatMessages}
@@ -230,7 +230,7 @@ const MatchPage = () => {
 									onInputChange={updateChatInputMessage}
 								/>
 							</div>
-							<div className="flex-shrink-0 p-4 space-y-4 bg-[#171717] border-t border-gray-700 overflow-y-auto max-h-[40%]">
+							<div className="flex-shrink-0 p-4 space-y-4 bg-gray-50 border-t border-gray-200 overflow-y-auto max-h-[40%]">
 								<RaceTrack participants={participants} />
 								<RecentActivities activities={activities} />
 							</div>
@@ -269,7 +269,7 @@ const MatchPage = () => {
 					)}
 
 					{activePanel === "chat" && (
-						<div className="h-full bg-[#1a1a1a] flex flex-col">
+						<div className="h-full bg-white flex flex-col">
 							<div className="flex-1 min-h-0">
 								<ChatPanel
 									messages={chatMessages}
@@ -284,7 +284,7 @@ const MatchPage = () => {
 								/>
 							</div>
 							<div className="flex-shrink-0 max-h-[40%] overflow-y-auto">
-								<div className="p-2 space-y-2 bg-[#171717] border-t border-gray-700">
+								<div className="p-2 space-y-2 bg-gray-50 border-t border-gray-200">
 									<RaceTrack participants={participants} isMobile={true} />
 									<RecentActivities activities={activities} isMobile={true} />
 								</div>

@@ -124,17 +124,19 @@ const RegisterModal = ({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+		<div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
 			<div
 				ref={modalRef}
-				className="bg-[#252525] rounded-lg shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200"
+				className="bg-white rounded-lg shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200 border border-gray-200"
 			>
 				<div className="p-6">
 					<div className="flex justify-between items-center mb-4">
-						<h2 className="text-xl font-semibold text-white">Create Account</h2>
+						<h2 className="text-xl font-semibold text-gray-900">
+							Create Account
+						</h2>
 						<button
 							onClick={handleClose}
-							className="text-gray-400 hover:text-white transition-colors"
+							className="text-gray-400 hover:text-gray-600 transition-colors"
 						>
 							<X size={20} />
 						</button>
@@ -159,7 +161,7 @@ const RegisterModal = ({
 						<div>
 							<label
 								htmlFor="username"
-								className="block text-sm font-medium text-gray-300 mb-1"
+								className="block text-sm font-medium text-gray-700 mb-1"
 							>
 								Username
 							</label>
@@ -169,14 +171,14 @@ const RegisterModal = ({
 								value={username}
 								onChange={(e) => setUsername(e.target.value)}
 								required
-								className="w-full px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-[#5bc6ca] focus:border-[#5bc6ca]"
+								className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
 							/>
 						</div>
 
 						<div>
 							<label
 								htmlFor="register-email"
-								className="block text-sm font-medium text-gray-300 mb-1"
+								className="block text-sm font-medium text-gray-700 mb-1"
 							>
 								Email
 							</label>
@@ -186,7 +188,7 @@ const RegisterModal = ({
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
 								required
-								className="w-full px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-[#5bc6ca] focus:border-[#5bc6ca]"
+								className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
 								placeholder="your@email.com"
 							/>
 						</div>
@@ -194,7 +196,7 @@ const RegisterModal = ({
 						<div>
 							<label
 								htmlFor="register-password"
-								className="block text-sm font-medium text-gray-300 mb-1"
+								className="block text-sm font-medium text-gray-700 mb-1"
 							>
 								Password
 							</label>
@@ -204,14 +206,14 @@ const RegisterModal = ({
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								required
-								className="w-full px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-[#5bc6ca] focus:border-[#5bc6ca]"
+								className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
 							/>
 						</div>
 
 						<div>
 							<label
 								htmlFor="confirm-password"
-								className="block text-sm font-medium text-gray-300 mb-1"
+								className="block text-sm font-medium text-gray-700 mb-1"
 							>
 								Confirm Password
 							</label>
@@ -221,7 +223,7 @@ const RegisterModal = ({
 								value={confirmPassword}
 								onChange={(e) => setConfirmPassword(e.target.value)}
 								required
-								className="w-full px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-[#5bc6ca] focus:border-[#5bc6ca]"
+								className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
 							/>
 						</div>
 
@@ -231,18 +233,18 @@ const RegisterModal = ({
 								type="checkbox"
 								checked={agreedToTerms}
 								onChange={(e) => setAgreedToTerms(e.target.checked)}
-								className="h-4 w-4 rounded border-gray-700 text-[#5bc6ca] focus:ring-[#5bc6ca]"
+								className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
 							/>
 							<label
 								htmlFor="agree-terms"
-								className="ml-2 block text-sm text-gray-300"
+								className="ml-2 block text-sm text-gray-600"
 							>
 								I agree to the{" "}
-								<a href="#" className="text-[#5bc6ca]">
+								<a href="#" className="text-sky-600">
 									Terms
 								</a>{" "}
 								and{" "}
-								<a href="#" className="text-[#5bc6ca]">
+								<a href="#" className="text-sky-600">
 									Privacy Policy
 								</a>
 							</label>
@@ -251,16 +253,16 @@ const RegisterModal = ({
 						<button
 							type="submit"
 							disabled={loading}
-							className="w-full bg-[#5bc6ca] hover:bg-[#48aeb3] text-white py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+							className="w-full bg-sky-600 hover:bg-sky-700 text-white py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							{loading ? "Creating account..." : "Create Account"}
 						</button>
 
-						<div className="text-center text-sm text-gray-400">
+						<div className="text-center text-sm text-gray-500">
 							Already have an account?{" "}
 							<button
 								type="button"
-								className="text-[#5bc6ca] hover:text-[#48aeb3]"
+								className="text-sky-600 hover:text-sky-700"
 								onClick={onSwitchModal}
 							>
 								Sign in

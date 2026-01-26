@@ -55,14 +55,14 @@ export const getTimeComplexityColor = (complexity: string): string => {
 	switch (complexity) {
 		case "O(1)":
 		case "O(log n)":
-			return "bg-[#6BCB77]/20 text-[#6BCB77]";
+			return "bg-green-100 text-green-700";
 		case "O(n)":
 		case "O(n log n)":
-			return "bg-[#FFD93D]/20 text-[#FFD93D]";
+			return "bg-yellow-100 text-yellow-700";
 		case "O(n²)":
-			return "bg-[#ffa726]/20 text-[#ffa726]";
+			return "bg-orange-100 text-orange-700";
 		default:
-			return "bg-[#FF6B6B]/20 text-[#FF6B6B]";
+			return "bg-red-100 text-red-700";
 	}
 };
 
@@ -73,13 +73,13 @@ export const getSpaceComplexityColor = (complexity: string): string => {
 	switch (complexity) {
 		case "O(1)":
 		case "O(log n)":
-			return "bg-[#6BCB77]/20 text-[#6BCB77]";
+			return "bg-green-100 text-green-700";
 		case "O(n)":
-			return "bg-[#FFD93D]/20 text-[#FFD93D]";
+			return "bg-yellow-100 text-yellow-700";
 		case "O(n²)":
-			return "bg-[#ffa726]/20 text-[#ffa726]";
+			return "bg-orange-100 text-orange-700";
 		default:
-			return "bg-[#FF6B6B]/20 text-[#FF6B6B]";
+			return "bg-red-100 text-red-700";
 	}
 };
 

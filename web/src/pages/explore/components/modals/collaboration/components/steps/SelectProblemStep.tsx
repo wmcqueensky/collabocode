@@ -39,10 +39,10 @@ const SelectProblemStep = ({
 		<div className="p-4 sm:p-6">
 			{/* Header */}
 			<div className="mb-6">
-				<h3 className="text-lg font-medium text-white mb-2">
+				<h3 className="text-lg font-medium text-gray-900 mb-2">
 					Select a Problem
 				</h3>
-				<p className="text-sm text-gray-400">
+				<p className="text-sm text-gray-600">
 					Choose a coding problem to solve together with your team.
 				</p>
 			</div>
@@ -52,14 +52,14 @@ const SelectProblemStep = ({
 				<div className="flex-1 relative">
 					<Search
 						size={16}
-						className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+						className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
 					/>
 					<input
 						type="text"
 						placeholder="Search problems..."
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						className={`w-full bg-[#2a2a2a] border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-200 focus:outline-none ${ACCENT.focus}`}
+						className={`w-full bg-white border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-900 focus:outline-none ${ACCENT.focus}`}
 					/>
 				</div>
 				<div className="flex gap-2">
@@ -70,7 +70,7 @@ const SelectProblemStep = ({
 							className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
 								difficultyFilter === diff
 									? `${ACCENT.bg} text-white`
-									: "bg-[#2a2a2a] text-gray-400 hover:text-white border border-gray-700"
+									: "bg-gray-100 text-gray-600 hover:text-gray-900 border border-gray-300"
 							}`}
 						>
 							{diff.charAt(0).toUpperCase() + diff.slice(1)}
@@ -86,14 +86,14 @@ const SelectProblemStep = ({
 						<div
 							key={problem.id}
 							onClick={() => setSelectedProblem(problem)}
-							className={`bg-[#2a2a2a] border rounded-lg p-4 cursor-pointer transition-all ${
+							className={`bg-white border rounded-lg p-4 cursor-pointer transition-all ${
 								selectedProblem?.id === problem.id
 									? `${ACCENT.border} ring-1 ${ACCENT.ring}`
-									: "border-gray-700 hover:border-gray-500"
+									: "border-gray-200 hover:border-gray-400"
 							}`}
 						>
 							<div className="flex justify-between items-start mb-2">
-								<h4 className="font-medium text-white">{problem.title}</h4>
+								<h4 className="font-medium text-gray-900">{problem.title}</h4>
 								<span
 									className={`px-2 py-0.5 rounded text-xs font-medium ${getDifficultyColor(
 										problem.difficulty,
@@ -103,7 +103,7 @@ const SelectProblemStep = ({
 								</span>
 							</div>
 							{problem.description && (
-								<p className="text-sm text-gray-400 line-clamp-2 mb-3">
+								<p className="text-sm text-gray-600 line-clamp-2 mb-3">
 									{problem.description}
 								</p>
 							)}
@@ -122,7 +122,7 @@ const SelectProblemStep = ({
 						</div>
 					))
 				) : (
-					<div className="text-center py-10 text-gray-400">
+					<div className="text-center py-10 text-gray-500">
 						<Code size={48} className="mx-auto mb-4 opacity-50" />
 						<p>No problems found.</p>
 						<p className="text-sm mt-2">

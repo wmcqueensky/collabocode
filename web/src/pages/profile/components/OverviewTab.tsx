@@ -22,20 +22,22 @@ const OverviewTab = ({
 }: OverviewTabProps) => {
 	return (
 		<div className="space-y-6">
-			<h3 className="text-lg font-semibold mb-3">Performance Overview</h3>
-			<p className="text-gray-400 mb-4">
+			<h3 className="text-lg font-semibold text-gray-900 mb-3">
+				Performance Overview
+			</h3>
+			<p className="text-gray-600 mb-4">
 				Track your progress across both competitive matches and collaborative
 				sessions.
 			</p>
 
 			{/* Performance Cards */}
 			<div className="grid md:grid-cols-2 gap-4">
-				<div className="bg-[#252525] rounded-lg border border-gray-700 p-4">
+				<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
 					<div className="flex items-center justify-between mb-3">
-						<span className="text-gray-400">Match Performance</span>
+						<span className="text-gray-600">Match Performance</span>
 						<Trophy className="text-yellow-500" size={20} />
 					</div>
-					<p className="text-2xl font-bold text-green-500">
+					<p className="text-2xl font-bold text-green-600">
 						{statistics.matchWins} Wins
 					</p>
 					<p className="text-sm text-gray-500 mt-1">
@@ -43,12 +45,12 @@ const OverviewTab = ({
 					</p>
 				</div>
 
-				<div className="bg-[#252525] rounded-lg border border-gray-700 p-4">
+				<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
 					<div className="flex items-center justify-between mb-3">
-						<span className="text-gray-400">Collaboration Activity</span>
-						<Users className="text-[#a78bfa]" size={20} />
+						<span className="text-gray-600">Collaboration Activity</span>
+						<Users className="text-purple-600" size={20} />
 					</div>
-					<p className="text-2xl font-bold text-[#a78bfa]">
+					<p className="text-2xl font-bold text-purple-600">
 						{statistics.totalCollaborations} Sessions
 					</p>
 					<p className="text-sm text-gray-500 mt-1">
@@ -59,7 +61,7 @@ const OverviewTab = ({
 
 			{/* Leaderboards Section */}
 			<div className="mt-8">
-				<h3 className="text-lg font-semibold mb-4 flex items-center">
+				<h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
 					<Crown size={20} className="mr-2 text-yellow-500" />
 					Leaderboards
 				</h3>

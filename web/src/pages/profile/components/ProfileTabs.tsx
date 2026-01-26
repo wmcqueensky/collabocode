@@ -13,15 +13,15 @@ const ProfileTabs = ({ activeTab, onTabChange }: ProfileTabsProps) => {
 	];
 
 	return (
-		<div className="flex border-b border-gray-800">
+		<div className="flex border-b border-gray-200">
 			{tabs.map((tab) => (
 				<button
 					key={tab.id}
 					onClick={() => onTabChange(tab.id)}
 					className={`flex-1 px-6 py-3 font-medium transition-colors ${
 						activeTab === tab.id
-							? "bg-[#5bc6ca] bg-opacity-10 text-[#5bc6ca] border-b-2 border-[#5bc6ca]"
-							: "text-gray-400 hover:text-white hover:bg-gray-800"
+							? "bg-sky-50 text-sky-600 border-b-2 border-sky-600"
+							: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
 					}`}
 				>
 					{tab.label}

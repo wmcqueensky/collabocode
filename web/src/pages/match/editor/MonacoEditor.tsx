@@ -17,7 +17,7 @@ export const MonacoEditor = ({
 				height="100%"
 				defaultLanguage={file.language}
 				value={file.content}
-				theme="vs-dark"
+				theme="vs"
 				onChange={handleEditorChange}
 				options={{
 					fontSize: isMobile ? 12 : 14,

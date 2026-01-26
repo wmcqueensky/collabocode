@@ -85,15 +85,15 @@ const Hero = () => {
 				className="absolute inset-0 w-full h-full object-cover"
 				src="/coding.mp4"
 			/>
-			<div className="absolute inset-0 bg-black/70" />
+			<div className="absolute inset-0 bg-white/80" />
 
 			<div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-center px-4">
 				<div className="flex items-center space-x-3 mb-4">
 					<h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold flex items-center flex-wrap justify-center">
-						{/* Logo icon with violet color */}
+						{/* Logo icon with purple color */}
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
-							className="w-10 h-10 md:w-14 md:h-14 text-[#a78bfa]"
+							className="w-10 h-10 md:w-14 md:h-14 text-purple-600"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -105,26 +105,26 @@ const Hero = () => {
 								d="M9.75 6.75L5.25 12l4.5 5.25M14.25 6.75L18.75 12l-4.5 5.25"
 							/>
 						</svg>
-						<span className="text-white ml-2">Collabo</span>
-						<span className="text-[#5bc6ca]">Code</span>
+						<span className="text-gray-900 ml-2">Collabo</span>
+						<span className="text-sky-600">Code</span>
 					</h1>
 				</div>
 
-				{/* Gradient text animation - teal to violet */}
-				<p className="text-xl sm:text-2xl md:text-3xl font-mono bg-gradient-to-r from-[#5bc6ca] to-[#a78bfa] bg-clip-text text-transparent h-10">
+				{/* Gradient text animation - sky to purple */}
+				<p className="text-xl sm:text-2xl md:text-3xl font-mono bg-gradient-to-r from-sky-600 to-purple-600 bg-clip-text text-transparent h-10">
 					{text}
 					<span className="animate-pulse">|</span>
 				</p>
 
 				<div className="flex flex-wrap justify-center gap-4 py-4 mt-8">
 					<a href="/explore">
-						<button className="px-6 py-3 bg-gradient-to-r from-[#5bc6ca] to-[#8b5cf6] text-white font-semibold rounded-xl opacity-80 hover:opacity-100 transition shadow-lg shadow-[#5bc6ca]/20">
+						<button className="px-6 py-3 bg-gradient-to-r from-sky-600 to-purple-600 text-white font-semibold rounded-xl opacity-90 hover:opacity-100 transition shadow-lg shadow-sky-600/20">
 							Get Started →
 						</button>
 					</a>
 					<button
 						onClick={(e) => scrollToSection(e, "why-collaboration")}
-						className="px-6 py-3 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-xl hover:bg-white/20 transition border border-white/20"
+						className="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition border border-gray-300"
 					>
 						Learn More ↓
 					</button>

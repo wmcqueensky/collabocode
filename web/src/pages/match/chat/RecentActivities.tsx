@@ -13,23 +13,23 @@ export const RecentActivities = ({
 	};
 
 	const activityColors: any = {
-		passed: "text-green-400",
-		modifying: "text-[#5bc6ca]",
-		ran: "text-yellow-400",
-		failed: "text-red-400",
-		submitted: "text-purple-400",
+		passed: "text-green-600",
+		modifying: "text-sky-600",
+		ran: "text-yellow-600",
+		failed: "text-red-500",
+		submitted: "text-purple-600",
 	};
 
 	return (
-		<div className="flex flex-col bg-[#2c2c2c] border-r border-gray-700">
+		<div className="flex flex-col bg-white border-r border-gray-200 rounded-lg">
 			{/* Header */}
-			<div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-700">
+			<div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
 				<h3
 					className={`${
 						isMobile ? "text-xs" : "text-sm"
-					} font-medium text-gray-200 flex items-center`}
+					} font-medium text-gray-900 flex items-center`}
 				>
-					<Clock size={isMobile ? 14 : 16} className="mr-2 text-[#5bc6ca]" />
+					<Clock size={isMobile ? 14 : 16} className="mr-2 text-sky-600" />
 					Activity Feed
 				</h3>
 			</div>
@@ -62,7 +62,7 @@ export const RecentActivities = ({
 										size={isMobile ? 12 : 14}
 										className="mr-2 flex-shrink-0"
 									/>
-									<span className="flex-1 truncate text-gray-300 min-w-0">
+									<span className="flex-1 truncate text-gray-700 min-w-0">
 										{activity.message}
 									</span>
 									<span

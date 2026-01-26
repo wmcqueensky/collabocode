@@ -168,12 +168,12 @@ export const CollaborativeMonacoEditor = ({
 			<div className="absolute top-2 right-2 z-10 flex items-center space-x-2">
 				{/* Remote Cursors Indicator */}
 				{remoteCursors.length > 0 && (
-					<div className="flex items-center space-x-1 bg-gray-800/90 rounded-full px-2 py-1">
+					<div className="flex items-center space-x-1 bg-white/90 rounded-full px-2 py-1 border border-gray-200 shadow-sm">
 						<div className="flex -space-x-1">
 							{remoteCursors.slice(0, 3).map((cursor) => (
 								<div
 									key={cursor.id}
-									className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium border border-gray-700"
+									className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium border border-white"
 									style={{ backgroundColor: cursor.color }}
 									title={`${cursor.name} - Line ${cursor.lineNumber}`}
 								>
@@ -182,7 +182,7 @@ export const CollaborativeMonacoEditor = ({
 							))}
 						</div>
 						{remoteCursors.length > 3 && (
-							<span className="text-xs text-gray-400">
+							<span className="text-xs text-gray-500">
 								+{remoteCursors.length - 3}
 							</span>
 						)}
@@ -203,7 +203,7 @@ export const CollaborativeMonacoEditor = ({
 				height="100%"
 				language={getMonacoLanguage(file.filename)}
 				value={bindingRef.current ? undefined : file.content}
-				theme="vs-dark"
+				theme="vs"
 				onMount={handleEditorDidMount}
 				onChange={handleEditorChange}
 				options={{

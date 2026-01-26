@@ -40,7 +40,7 @@ export const CollaboratorsList = ({
 					{joinedParticipants.slice(0, 4).map((participant, index) => (
 						<div
 							key={participant.id}
-							className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 border-[#2c2c2c] ${getAvatarColor(
+							className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 border-white ${getAvatarColor(
 								participant.user_id,
 								index,
 							)} ${getTextColor(index)}`}
@@ -50,7 +50,7 @@ export const CollaboratorsList = ({
 						</div>
 					))}
 					{joinedParticipants.length > 4 && (
-						<div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 border-[#2c2c2c] bg-gray-600 text-white">
+						<div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 border-white bg-gray-400 text-white">
 							+{joinedParticipants.length - 4}
 						</div>
 					)}
@@ -60,12 +60,12 @@ export const CollaboratorsList = ({
 	}
 
 	return (
-		<div className="bg-[#252525] rounded-lg border border-gray-700 overflow-hidden">
+		<div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
+			<div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
 				<div className="flex items-center space-x-2">
 					<Users size={16} className="text-purple-500" />
-					<span className="text-sm font-medium text-gray-300">
+					<span className="text-sm font-medium text-gray-700">
 						Collaborators
 					</span>
 				</div>
@@ -85,7 +85,7 @@ export const CollaboratorsList = ({
 						<div
 							key={participant.id}
 							className={`flex items-center justify-between p-2 rounded-lg ${
-								isCurrentUser ? "bg-purple-500/10" : "hover:bg-gray-700/50"
+								isCurrentUser ? "bg-purple-50" : "hover:bg-gray-50"
 							}`}
 						>
 							<div className="flex items-center space-x-2">
@@ -100,7 +100,7 @@ export const CollaboratorsList = ({
 										{participant.user?.username?.charAt(0).toUpperCase() || "?"}
 									</div>
 									{/* Online indicator */}
-									<div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#252525]" />
+									<div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
 								</div>
 
 								{/* Name and role */}
@@ -108,7 +108,7 @@ export const CollaboratorsList = ({
 									<div className="flex items-center space-x-1">
 										<span
 											className={`text-sm font-medium truncate ${
-												isCurrentUser ? "text-purple-400" : "text-gray-200"
+												isCurrentUser ? "text-purple-600" : "text-gray-700"
 											}`}
 										>
 											{participant.user?.username || "Unknown"}
@@ -129,13 +129,13 @@ export const CollaboratorsList = ({
 
 							{/* Role badge */}
 							{isHost && (
-								<div className="flex items-center space-x-1 text-xs text-yellow-500">
+								<div className="flex items-center space-x-1 text-xs text-yellow-600">
 									<Crown size={12} />
 									<span>Host</span>
 								</div>
 							)}
 							{isViewer && (
-								<div className="flex items-center space-x-1 text-xs text-gray-400">
+								<div className="flex items-center space-x-1 text-xs text-gray-500">
 									<Eye size={12} />
 									<span>Viewer</span>
 								</div>

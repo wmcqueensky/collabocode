@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 const Footer = ({ isChatOpen, setIsChatOpen }: any) => {
 	return (
-		<footer className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-2 bg-[#2c2c2c] border-t border-gray-700 text-xs text-gray-400">
+		<footer className="flex items-center justify-between px-2 sm:px-4 py-1 sm:py-2 bg-white border-t border-gray-200 text-xs text-gray-500">
 			<div className="flex items-center space-x-2 sm:space-x-4">
 				<div className="text-xs">JavaScript</div>
 				<div className="text-xs">UTF-8</div>
@@ -11,7 +11,7 @@ const Footer = ({ isChatOpen, setIsChatOpen }: any) => {
 			<div className="flex items-center space-x-2">
 				{/* Desktop chat toggle */}
 				<button
-					className="hidden md:flex min-w-[80px] sm:min-w-[100px] px-2 py-1 items-center hover:text-gray-200"
+					className="hidden md:flex min-w-[80px] sm:min-w-[100px] px-2 py-1 items-center hover:text-gray-700"
 					onClick={() => setIsChatOpen(!isChatOpen)}
 				>
 					{isChatOpen ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
@@ -21,7 +21,7 @@ const Footer = ({ isChatOpen, setIsChatOpen }: any) => {
 				</button>
 				<a
 					href="#"
-					className="flex items-center hover:text-gray-200"
+					className="flex items-center hover:text-gray-700"
 					target="_blank"
 					rel="noopener noreferrer"
 				>

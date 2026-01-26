@@ -23,15 +23,15 @@ export const ProblemPanel = ({
 		<div
 			className={`${
 				isMobile ? "w-full h-full" : "w-96 lg:w-80 xl:w-96"
-			} flex flex-col bg-[#2c2c2c] border-r border-gray-700`}
+			} flex flex-col bg-white border-r border-gray-200`}
 		>
 			{/* Tabs */}
-			<div className="flex border-b border-gray-700">
+			<div className="flex border-b border-gray-200">
 				<button
 					className={`flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm ${
 						activeTab === "description"
-							? "border-b-2 border-[#5bc6ca] text-[#5bc6ca]"
-							: "text-gray-400"
+							? "border-b-2 border-sky-600 text-sky-600"
+							: "text-gray-500"
 					}`}
 					onClick={() => setActiveTab("description")}
 				>
@@ -40,8 +40,8 @@ export const ProblemPanel = ({
 				<button
 					className={`flex-1 px-3 sm:px-4 py-2 text-xs sm:text-sm ${
 						activeTab === "tests"
-							? "border-b-2 border-[#5bc6ca] text-[#5bc6ca]"
-							: "text-gray-400"
+							? "border-b-2 border-sky-600 text-sky-600"
+							: "text-gray-500"
 					}`}
 					onClick={() => setActiveTab("tests")}
 				>

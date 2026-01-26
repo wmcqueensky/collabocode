@@ -28,9 +28,9 @@ export const NotificationList = ({
 	}
 
 	return (
-		<div className="divide-y divide-gray-700">
+		<div className="divide-y divide-gray-200">
 			{notifications.map((notification) => (
-				<div key={notification.id} className="p-4 hover:bg-gray-800 transition">
+				<div key={notification.id} className="p-4 hover:bg-gray-50 transition">
 					{notification.type === "match_completed" ||
 					notification.type === "collaboration_completed" ? (
 						<CompletedNotificationItem

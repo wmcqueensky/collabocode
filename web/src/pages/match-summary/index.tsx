@@ -39,7 +39,7 @@ export default function MatchSummaryPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-[#171717] text-gray-200">
+		<div className="min-h-screen bg-gray-50 text-gray-700">
 			<Header />
 
 			<main className="container mx-auto py-6 px-4 max-w-5xl">

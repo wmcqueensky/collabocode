@@ -7,13 +7,13 @@ import {
 	getDifficultyColor,
 } from "../../constants";
 
-// Accent colors for competition modal (teal)
+// Accent colors for competition modal (sky blue)
 const ACCENT = {
-	bg: "bg-[#5bc6ca]",
-	bgLight: "bg-[#5bc6ca]/20",
-	bgLighter: "bg-[#5bc6ca]/10",
-	text: "text-[#5bc6ca]",
-	border: "border-[#5bc6ca]",
+	bg: "bg-sky-600",
+	bgLight: "bg-sky-100",
+	bgLighter: "bg-sky-50",
+	text: "text-sky-600",
+	border: "border-sky-600",
 };
 
 const getPlayerCountLabel = (count: number): string => {
@@ -42,13 +42,13 @@ const ConfigureSessionStep = ({
 		<div className="p-4 sm:p-6 space-y-5">
 			{/* Selected Problem Summary */}
 			{selectedProblem && (
-				<div className={`bg-[#2a2a2a] rounded-lg p-4 border ${ACCENT.border}`}>
+				<div className={`bg-gray-50 rounded-lg p-4 border ${ACCENT.border}`}>
 					<div className="flex items-start space-x-3">
 						<div className={`p-2 ${ACCENT.bgLight} rounded-lg`}>
 							<Trophy className={ACCENT.text} size={20} />
 						</div>
 						<div className="flex-1 min-w-0">
-							<h3 className="font-medium text-white truncate">
+							<h3 className="font-medium text-gray-900 truncate">
 								{selectedProblem.title}
 							</h3>
 							<div className="flex flex-wrap items-center gap-2 mt-1">
@@ -64,7 +64,7 @@ const ConfigureSessionStep = ({
 									.map((tag: string, i: number) => (
 										<span
 											key={i}
-											className="px-2 py-0.5 bg-gray-700 text-gray-300 rounded-full text-xs"
+											className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full text-xs"
 										>
 											{tag}
 										</span>
@@ -77,7 +77,7 @@ const ConfigureSessionStep = ({
 
 			{/* Language Selection */}
 			<div>
-				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+				<label className="flex items-center text-gray-700 text-sm font-medium mb-2">
 					<Code size={16} className={`mr-2 ${ACCENT.text}`} />
 					Programming Language
 				</label>
@@ -88,8 +88,8 @@ const ConfigureSessionStep = ({
 							onClick={() => setSelectedLanguage(lang.id)}
 							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
 								selectedLanguage === lang.id
-									? `${ACCENT.bg} text-black`
-									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+									? `${ACCENT.bg} text-white`
+									: "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
 							}`}
 						>
 							{lang.name}
@@ -100,7 +100,7 @@ const ConfigureSessionStep = ({
 
 			{/* Time Limit */}
 			<div>
-				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+				<label className="flex items-center text-gray-700 text-sm font-medium mb-2">
 					<Clock size={16} className={`mr-2 ${ACCENT.text}`} />
 					Time Limit
 				</label>
@@ -111,8 +111,8 @@ const ConfigureSessionStep = ({
 							onClick={() => setTimeLimit(time)}
 							className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
 								timeLimit === time
-									? `${ACCENT.bg} text-black`
-									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+									? `${ACCENT.bg} text-white`
+									: "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
 							}`}
 						>
 							{time} min
@@ -123,7 +123,7 @@ const ConfigureSessionStep = ({
 
 			{/* Player Count */}
 			<div>
-				<label className="flex items-center text-gray-300 text-sm font-medium mb-2">
+				<label className="flex items-center text-gray-700 text-sm font-medium mb-2">
 					<Users size={16} className={`mr-2 ${ACCENT.text}`} />
 					Number of Players
 				</label>
@@ -134,8 +134,8 @@ const ConfigureSessionStep = ({
 							onClick={() => setPlayerCount(count)}
 							className={`px-3 py-3 rounded-lg text-sm font-medium transition-all ${
 								playerCount === count
-									? `${ACCENT.bg} text-black`
-									: "bg-[#2a2a2a] text-gray-300 hover:bg-[#333] border border-gray-600"
+									? `${ACCENT.bg} text-white`
+									: "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
 							}`}
 						>
 							<div className="flex flex-col items-center">
@@ -156,7 +156,7 @@ const ConfigureSessionStep = ({
 				<h4 className={`${ACCENT.text} font-medium text-sm mb-2`}>
 					⚔️ Competitive Match
 				</h4>
-				<ul className="text-gray-400 text-xs space-y-1">
+				<ul className="text-gray-600 text-xs space-y-1">
 					<li>• Each player writes their own solution independently</li>
 					<li>• Race against others to solve the problem first</li>
 					<li>• Earn rating points based on your performance</li>

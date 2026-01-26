@@ -2,12 +2,12 @@ import type { SessionParticipant } from "./types";
 
 // Profile page accent colors
 export const ACCENT = {
-	primary: "bg-[#5bc6ca]",
-	primaryHover: "hover:bg-[#48aeb3]",
-	primaryText: "text-[#5bc6ca]",
-	primaryBorder: "border-[#5bc6ca]",
-	collaboration: "text-[#a78bfa]",
-	collaborationBg: "bg-[#a78bfa]",
+	primary: "bg-sky-600",
+	primaryHover: "hover:bg-sky-700",
+	primaryText: "text-sky-600",
+	primaryBorder: "border-sky-600",
+	collaboration: "text-purple-600",
+	collaborationBg: "bg-purple-600",
 } as const;
 
 /**

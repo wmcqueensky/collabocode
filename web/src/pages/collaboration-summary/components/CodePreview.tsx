@@ -19,17 +19,17 @@ export default function CodePreview({
 	}
 
 	return (
-		<div className="bg-[#2c2c2c] rounded-lg p-6 border border-gray-700">
-			<h3 className="text-lg font-semibold mb-4 flex items-center">
+		<div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+			<h3 className="text-lg font-semibold mb-4 flex items-center text-gray-900">
 				<Code className="mr-2 text-purple-500" size={20} />
 				Your Team's Solution
 			</h3>
-			<div className="rounded-lg overflow-hidden border border-gray-700">
+			<div className="rounded-lg overflow-hidden border border-gray-200">
 				<Editor
 					height="400px"
 					language={getMonacoLanguage(language)}
 					value={sharedCode}
-					theme="vs-dark"
+					theme="vs"
 					options={{
 						readOnly: true,
 						fontSize: 14,
