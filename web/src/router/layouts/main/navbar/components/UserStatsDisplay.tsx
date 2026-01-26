@@ -1,38 +1,20 @@
-import { Flame, Trophy, Target, Users } from "lucide-react";
-import type { UserStats, ModalType } from "../types";
+import { Trophy, Target, Users } from "lucide-react";
+import type { UserStats } from "../types";
 import { StatSkeleton } from "./StatSkeleton";
 
 interface UserStatsDisplayProps {
 	statsLoading: boolean;
 	userStats: UserStats;
 	totalSolved: number;
-	onOpenModal: (modal: ModalType) => void;
 }
 
 export const UserStatsDisplay = ({
 	statsLoading,
 	userStats,
 	totalSolved,
-	onOpenModal,
 }: UserStatsDisplayProps) => {
 	return (
 		<div className="hidden lg:flex items-center space-x-3 mr-2">
-			{/* Streak */}
-			{statsLoading ? (
-				<StatSkeleton />
-			) : (
-				<button
-					onClick={() => onOpenModal("streak")}
-					className="flex items-center space-x-1 bg-[#252525] px-3 py-1.5 rounded-lg border border-gray-700 transition-all duration-300 hover:border-orange-500/50 hover:bg-[#2a2a2a]"
-				>
-					<Flame size={16} className="text-orange-500" />
-					<span className="text-sm font-semibold text-white">
-						{userStats.streak}
-					</span>
-					<span className="text-xs text-gray-400">streak</span>
-				</button>
-			)}
-
 			{/* Match Rating */}
 			{statsLoading ? (
 				<StatSkeleton />

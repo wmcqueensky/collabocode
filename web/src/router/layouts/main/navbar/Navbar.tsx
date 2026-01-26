@@ -2,7 +2,6 @@ import { Menu, X } from "lucide-react";
 import NotificationCenter from "../../../../notifications";
 import LoginModal from "./modals/login/LoginModal";
 import RegisterModal from "./modals/register/RegisterModal";
-import StreakModal from "./modals/streak/StreakModal";
 
 // Hooks
 import { useNavbar } from "./hooks/useNavbar";
@@ -84,7 +83,6 @@ const Navbar = () => {
 								statsLoading={statsLoading}
 								userStats={userStats}
 								totalSolved={totalSolved}
-								onOpenModal={openModal}
 							/>
 
 							{/* Notifications */}
@@ -105,7 +103,6 @@ const Navbar = () => {
 								onToggleMenu={toggleUserMenu}
 								onCloseMenu={closeUserMenu}
 								onLogout={handleLogout}
-								onOpenModal={openModal}
 								isActive={isActive}
 							/>
 						</>
@@ -148,12 +145,6 @@ const Navbar = () => {
 				isOpen={activeModal === "register"}
 				onClose={closeModal}
 				onSwitchModal={switchToLogin}
-			/>
-
-			<StreakModal
-				isOpen={activeModal === "streak"}
-				onClose={closeModal}
-				streak={userStats.streak}
 			/>
 		</header>
 	);

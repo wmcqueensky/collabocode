@@ -58,28 +58,6 @@ export function useNavbar() {
 		}
 	}, [user]);
 
-	// Check daily login for streak
-	const checkDailyLogin = useCallback(async () => {
-		if (!user) return;
-
-		try {
-			const lastLoginKey = `lastLogin_${user.id}`;
-			const lastLogin = localStorage.getItem(lastLoginKey);
-			const today = new Date().toDateString();
-
-			if (lastLogin !== today) {
-				const streakResult = await userService.updateDailyStreak(user.id);
-				if (streakResult) {
-					setUserStats((prev) => ({ ...prev, streak: streakResult.streak }));
-					setActiveModal("streak");
-				}
-				localStorage.setItem(lastLoginKey, today);
-			}
-		} catch (error) {
-			console.error("Error checking daily login:", error);
-		}
-	}, [user]);
-
 	// Toggle user menu
 	const toggleUserMenu = useCallback(() => {
 		setShowUserMenu((prev) => !prev);
@@ -122,7 +100,6 @@ export function useNavbar() {
 	useEffect(() => {
 		if (user) {
 			fetchUserStats();
-			checkDailyLogin();
 
 			const channel = supabase
 				.channel("profile-changes")
@@ -144,7 +121,7 @@ export function useNavbar() {
 				supabase.removeChannel(channel);
 			};
 		}
-	}, [user, fetchUserStats, checkDailyLogin]);
+	}, [user, fetchUserStats]);
 
 	// Close user menu when clicking outside
 	useEffect(() => {

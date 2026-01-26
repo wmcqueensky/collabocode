@@ -1,4 +1,4 @@
-import { Target, Flame, Award, CheckCircle, Trophy, Users } from "lucide-react";
+import { Target, Award, CheckCircle, Trophy, Users } from "lucide-react";
 
 import type { Statistics } from "../types";
 
@@ -16,7 +16,7 @@ const StatisticsGrid = ({
 	collaborationSolved,
 }: StatisticsGridProps) => {
 	return (
-		<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+		<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
 			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
 				<div className="flex items-center space-x-2 mb-2">
 					<Target className="text-[#5bc6ca]" size={20} />
@@ -26,14 +26,6 @@ const StatisticsGrid = ({
 				<p className="text-xs text-gray-500">
 					M: {matchSolved} | C: {collaborationSolved}
 				</p>
-			</div>
-
-			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">
-				<div className="flex items-center space-x-2 mb-2">
-					<Flame className="text-orange-500" size={20} />
-					<span className="text-gray-400 text-sm">Current Streak</span>
-				</div>
-				<p className="text-2xl font-bold">{statistics.currentStreak}</p>
 			</div>
 
 			<div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-4">

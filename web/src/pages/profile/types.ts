@@ -38,8 +38,6 @@ export interface Statistics {
 	collaborationSuccessRate: number;
 	collaborationSuccesses: number;
 	averageRanking: number;
-	currentStreak: number;
-	longestStreak: number;
 }
 
 export interface LeaderboardEntry {
@@ -66,8 +64,6 @@ export const DEFAULT_STATISTICS: Statistics = {
 	collaborationSuccessRate: 0,
 	collaborationSuccesses: 0,
 	averageRanking: 0,
-	currentStreak: 0,
-	longestStreak: 0,
 };
 
 export const DEFAULT_LEADERBOARDS: Leaderboards = {

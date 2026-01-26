@@ -4,11 +4,10 @@ export interface UserStats {
 	collaborationRating: number;
 	matchSolved: number;
 	collaborationSolved: number;
-	streak: number;
 }
 
 // Modal types
-export type ModalType = "login" | "register" | "streak" | null;
+export type ModalType = "login" | "register" | null;
 
 // Default user stats
 export const DEFAULT_USER_STATS: UserStats = {
@@ -16,5 +15,4 @@ export const DEFAULT_USER_STATS: UserStats = {
 	collaborationRating: 1500,
 	matchSolved: 0,
 	collaborationSolved: 0,
-	streak: 0,
 };

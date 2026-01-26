@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../../contexts/AuthContext";
 import { supabase } from "../../../lib/supabase";
-import { calculateStreaks } from "../constants";
 import type {
 	UserProfile,
 	SessionHistory,
@@ -192,9 +191,6 @@ export const useProfilePage = () => {
 						? (successfulCollaborations / totalCollaborations) * 100
 						: 0;
 
-				// Calculate streaks
-				const { currentStreak, longestStreak } = calculateStreaks(history);
-
 				// Calculate average ranking for completed matches
 				const completedMatches = matches.filter((m) => m.completed);
 				const avgRanking =
@@ -212,8 +208,6 @@ export const useProfilePage = () => {
 					collaborationSuccessRate,
 					collaborationSuccesses: successfulCollaborations,
 					averageRanking: avgRanking,
-					currentStreak,
-					longestStreak,
 				});
 			}
 		} catch (error) {

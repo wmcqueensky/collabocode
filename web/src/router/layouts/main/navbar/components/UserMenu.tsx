@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { ChevronDown, Flame, Trophy, Target, Users } from "lucide-react";
+import { ChevronDown, Trophy, Target, Users } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-import type { UserStats, ModalType } from "../types";
+import type { UserStats } from "../types";
 
 interface UserMenuProps {
 	user: User;
@@ -14,7 +14,6 @@ interface UserMenuProps {
 	onToggleMenu: () => void;
 	onCloseMenu: () => void;
 	onLogout: () => void;
-	onOpenModal: (modal: ModalType) => void;
 	isActive: (path: string) => boolean;
 }
 
@@ -29,7 +28,6 @@ export const UserMenu = ({
 	onToggleMenu,
 	onCloseMenu,
 	onLogout,
-	onOpenModal,
 	isActive,
 }: UserMenuProps) => {
 	return (
@@ -72,19 +70,6 @@ export const UserMenu = ({
 								</>
 							) : (
 								<>
-									<button
-										onClick={() => {
-											onCloseMenu();
-											onOpenModal("streak");
-										}}
-										className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded hover:bg-[#252525] transition-colors"
-									>
-										<Flame size={14} className="text-orange-500" />
-										<span className="text-xs font-semibold text-white">
-											{userStats.streak}
-										</span>
-										<span className="text-xs text-gray-500">streak</span>
-									</button>
 									<div className="flex items-center space-x-1 bg-[#1a1a1a] px-2 py-1 rounded">
 										<Trophy size={14} className="text-yellow-500" />
 										<span className="text-xs font-semibold text-white">

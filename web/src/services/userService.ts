@@ -228,79 +228,12 @@ export const userService = {
 		return data || [];
 	},
 
-	// Update daily streak - called when user logs in for the day
-	async updateDailyStreak(
-		userId: string,
-	): Promise<{ streak: number; isNewDay: boolean } | null> {
-		try {
-			const { data: profile, error: fetchError } = await supabase
-				.from("profiles")
-				.select("streak, last_login_date")
-				.eq("id", userId)
-				.single();
-
-			if (fetchError) {
-				console.error("Error fetching profile for streak:", fetchError);
-				return null;
-			}
-
-			// Get today's date in local timezone as YYYY-MM-DD string
-			// Using local date methods to avoid timezone conversion issues
-			const now = new Date();
-			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-
-			// Get last login date string directly from database (already in YYYY-MM-DD format)
-			const lastLoginStr = profile?.last_login_date || null;
-
-			// If already logged in today, return current streak
-			if (lastLoginStr === todayStr) {
-				return { streak: profile?.streak || 0, isNewDay: false };
-			}
-
-			let newStreak = 1;
-
-			if (lastLoginStr) {
-				// Calculate yesterday's date in local timezone
-				const yesterday = new Date(now);
-				yesterday.setDate(yesterday.getDate() - 1);
-				const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
-
-				// If last login was yesterday, increment streak
-				if (lastLoginStr === yesterdayStr) {
-					newStreak = (profile?.streak || 0) + 1;
-				}
-				// Otherwise, streak resets to 1
-			}
-
-			// Update profile with new streak and last login date
-			const { error: updateError } = await supabase
-				.from("profiles")
-				.update({
-					streak: newStreak,
-					last_login_date: todayStr,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("id", userId);
-
-			if (updateError) {
-				console.error("Error updating streak:", updateError);
-				return null;
-			}
-
-			return { streak: newStreak, isNewDay: true };
-		} catch (error) {
-			console.error("Error in updateDailyStreak:", error);
-			return null;
-		}
-	},
-
 	// Get user statistics for both modes
 	async getUserStats(userId?: string): Promise<{
 		matchRating: number;
 		collaborationRating: number;
 		matchSolved: number;
 		collaborationSolved: number;
-		streak: number;
 	}> {
 		const {
 			data: { user },
@@ -313,14 +246,13 @@ export const userService = {
 				collaborationRating: 1500,
 				matchSolved: 0,
 				collaborationSolved: 0,
-				streak: 0,
 			};
 		}
 
 		const { data: profile, error } = await supabase
 			.from("profiles")
 			.select(
-				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved, streak, last_login_date",
+				"match_rating, collaboration_rating, match_solved, collaboration_solved, rating, problems_solved",
 			)
 			.eq("id", targetUserId)
 			.single();
@@ -332,29 +264,7 @@ export const userService = {
 				collaborationRating: 1500,
 				matchSolved: 0,
 				collaborationSolved: 0,
-				streak: 0,
 			};
-		}
-
-		// Verify streak is still valid (hasn't been broken)
-		let currentStreak = profile?.streak || 0;
-		if (profile?.last_login_date) {
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-
-			const lastLogin = new Date(profile.last_login_date);
-			lastLogin.setHours(0, 0, 0, 0);
-
-			const yesterday = new Date(today);
-			yesterday.setDate(yesterday.getDate() - 1);
-
-			// If last login wasn't today or yesterday, streak is broken
-			if (
-				lastLogin.getTime() !== today.getTime() &&
-				lastLogin.getTime() !== yesterday.getTime()
-			) {
-				currentStreak = 0;
-			}
 		}
 
 		return {
@@ -362,34 +272,6 @@ export const userService = {
 			collaborationRating: profile?.collaboration_rating ?? 1500,
 			matchSolved: profile?.match_solved ?? profile?.problems_solved ?? 0,
 			collaborationSolved: profile?.collaboration_solved ?? 0,
-			streak: currentStreak,
 		};
-	},
-
-	// Legacy helper function to calculate streak from history (deprecated)
-	calculateStreak(
-		matches: Array<{ created_at: string; completed: boolean }>,
-	): number {
-		if (!matches || matches.length === 0) return 0;
-
-		let streak = 0;
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-
-		for (let i = 0; i < matches.length; i++) {
-			const matchDate = new Date(matches[i].created_at);
-			matchDate.setHours(0, 0, 0, 0);
-
-			const expectedDate = new Date(today);
-			expectedDate.setDate(today.getDate() - i);
-
-			if (matchDate.getTime() === expectedDate.getTime()) {
-				streak++;
-			} else {
-				break;
-			}
-		}
-
-		return streak;
 	},
 };

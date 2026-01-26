@@ -208,5 +208,4 @@ export interface UserStats {
 	collaborationRating: number;
 	matchSolved: number;
 	collaborationSolved: number;
-	streak: number;
 }
