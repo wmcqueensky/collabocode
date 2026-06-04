@@ -6,6 +6,122 @@ import type { SessionType } from "../types/database";
 
 export const matchService = {
 	/**
+	 * Calculate expected score using ELO formula
+	 * E = 1 / (1 + 10^((ratingB - ratingA) / 400))
+	 */
+	calculateExpectedScore(ratingA: number, ratingB: number): number {
+		return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+	},
+
+	/**
+	 * Get K-factor based on player's current rating
+	 * Lower K for higher-rated players (more stability)
+	 */
+	getKFactor(rating: number): number {
+		if (rating < 1000) return 40; // New players: faster adjustment
+		if (rating < 1500) return 32; // Intermediate: moderate adjustment
+		return 24; // Experienced: slower adjustment
+	},
+
+	/**
+	 * Get difficulty multiplier for rating calculations
+	 */
+	getDifficultyMultiplier(difficulty: string): number {
+		switch (difficulty?.toLowerCase()) {
+			case "easy":
+				return 0.8;
+			case "medium":
+				return 1.0;
+			case "hard":
+				return 1.2;
+			default:
+				return 1.0;
+		}
+	},
+
+	/**
+	 * Calculate pair-wise ELO rating changes for all participants
+	 * Each player is compared against every other player
+	 */
+	async calculateMatchRatingChanges(
+		participants: any[],
+		problemId: string,
+	): Promise<Map<string, number>> {
+		const ratingChanges = new Map<string, number>();
+
+		// Get problem difficulty
+		const { data: problem } = await supabase
+			.from("problems")
+			.select("difficulty")
+			.eq("id", problemId)
+			.single();
+
+		const difficultyMultiplier = this.getDifficultyMultiplier(
+			problem?.difficulty || "Medium",
+		);
+
+		console.log(
+			`📊 Problem difficulty: ${problem?.difficulty}, multiplier: ${difficultyMultiplier}`,
+		);
+
+		// Get current ratings for all participants
+		const participantsWithRatings = await Promise.all(
+			participants.map(async (p) => {
+				const profile = await userService.getProfileById(p.user_id);
+				return {
+					...p,
+					currentRating: profile?.match_rating || profile?.rating || 1000,
+				};
+			}),
+		);
+
+		// Calculate pair-wise ELO for each participant
+		for (const playerA of participantsWithRatings) {
+			let totalChange = 0;
+
+			for (const playerB of participantsWithRatings) {
+				if (playerA.user_id === playerB.user_id) continue;
+
+				// Calculate expected score based on rating difference
+				const expected = this.calculateExpectedScore(
+					playerA.currentRating,
+					playerB.currentRating,
+				);
+
+				// Actual score: 1 if A ranked higher (lower number = better), 0 otherwise
+				// Handle ties and non-submissions
+				let actual: number;
+				if (playerA.ranking === null && playerB.ranking === null) {
+					actual = 0.5; // Both didn't submit
+				} else if (playerA.ranking === null) {
+					actual = 0; // A didn't submit, B did
+				} else if (playerB.ranking === null) {
+					actual = 1; // A submitted, B didn't
+				} else if (playerA.ranking < playerB.ranking) {
+					actual = 1; // A ranked higher
+				} else if (playerA.ranking > playerB.ranking) {
+					actual = 0; // B ranked higher
+				} else {
+					actual = 0.5; // Tie
+				}
+
+				const K = this.getKFactor(playerA.currentRating);
+				totalChange += K * difficultyMultiplier * (actual - expected);
+			}
+
+			// Round and cap the change to prevent extreme swings
+			const cappedChange = Math.round(Math.max(-50, Math.min(50, totalChange)));
+			ratingChanges.set(playerA.user_id, cappedChange);
+
+			console.log(
+				`📊 ${playerA.user_id}: rating ${playerA.currentRating}, rank ${playerA.ranking}, change: ${cappedChange > 0 ? "+" : ""}${cappedChange}`,
+			);
+		}
+
+		return ratingChanges;
+	},
+
+	/**
 	 * Calculate rankings after session ends
 	 */
 	async calculateRankings(sessionId: string): Promise<void> {
@@ -167,13 +283,16 @@ export const matchService = {
 			useSessionHistory = false;
 		}
 
+		// Calculate ELO rating changes using pair-wise comparison
+		const ratingChanges = await this.calculateMatchRatingChanges(
+			participants,
+			session.problem_id,
+		);
+
 		for (const participant of participants) {
 			const isWinner = participant.ranking === 1;
 			const result = isWinner ? "win" : "loss";
-			const ratingChange = this.calculateEloRatingChange(
-				participant.ranking || 999,
-				participants.length,
-			);
+			const ratingChange = ratingChanges.get(participant.user_id) || 0;
 
 			console.log(`📝 Recording for ${participant.user_id}:`, {
 				result,
@@ -228,7 +347,7 @@ export const matchService = {
 				if (sessionType === "match") {
 					updates.match_rating = Math.max(
 						0,
-						(profile.match_rating || profile.rating || 1500) + ratingChange,
+						(profile.match_rating || profile.rating || 1000) + ratingChange,
 					);
 					updates.rating = updates.match_rating; // Backward compatibility
 
@@ -240,7 +359,7 @@ export const matchService = {
 				} else {
 					updates.collaboration_rating = Math.max(
 						0,
-						(profile.collaboration_rating || 1500) + ratingChange,
+						(profile.collaboration_rating || 1000) + ratingChange,
 					);
 
 					if (participant.is_correct) {
@@ -271,7 +390,8 @@ export const matchService = {
 	},
 
 	/**
-	 * Calculate ELO-style rating change
+	 * @deprecated Use calculateMatchRatingChanges for true ELO calculation
+	 * Legacy simple ranking-based point calculation (kept for backward compatibility)
 	 */
 	calculateEloRatingChange(ranking: number, totalParticipants: number): number {
 		const basePoints = 10;
